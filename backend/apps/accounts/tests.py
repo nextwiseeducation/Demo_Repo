@@ -1,11 +1,13 @@
 from django.contrib.auth import get_user_model
 from django.contrib.auth.tokens import default_token_generator
 from django.core import mail
+from django.core.cache import cache
 from django.urls import reverse
 from django.utils.encoding import force_bytes
 from django.utils.http import urlsafe_base64_encode
 from rest_framework import status
 from rest_framework.test import APITestCase
+from rest_framework.throttling import ScopedRateThrottle
 
 from .tokens import make_verification_token
 
@@ -112,3 +114,55 @@ class PasswordResetTests(APITestCase):
             {"uid": uid, "token": "bad-token", "new_password": "a-new-strong-password-456"},
         )
         self.assertEqual(response.status_code, status.HTTP_400_BAD_REQUEST)
+
+
+class ThrottlingTests(APITestCase):
+    """
+    Confirms register/login are actually rate-limited, using a 2/min test
+    rate (vs. the real 5/hour and 10/min) so the test stays fast.
+
+    ScopedRateThrottle.THROTTLE_RATES is bound as a class attribute at
+    import time (rest_framework/throttling.py), so django.test.override_settings
+    on REST_FRAMEWORK does NOT reach it — it has to be patched directly.
+    Throttle state also lives in the default cache, which persists across
+    tests in the same run unless cleared.
+    """
+
+    def setUp(self):
+        cache.clear()
+        self._original_rates = ScopedRateThrottle.THROTTLE_RATES
+        ScopedRateThrottle.THROTTLE_RATES = {
+            "register": "2/min",
+            "login": "2/min",
+            "password_reset": "2/min",
+            "password_reset_confirm": "2/min",
+        }
+
+    def tearDown(self):
+        ScopedRateThrottle.THROTTLE_RATES = self._original_rates
+
+    def test_register_throttled_after_limit(self):
+        for i in range(2):
+            response = self.client.post(
+                reverse("register"),
+                {"email": f"student{i}@example.com", "password": "a-strong-password-123"},
+            )
+            self.assertEqual(response.status_code, status.HTTP_201_CREATED)
+
+        response = self.client.post(
+            reverse("register"),
+            {"email": "student-over-limit@example.com", "password": "a-strong-password-123"},
+        )
+        self.assertEqual(response.status_code, status.HTTP_429_TOO_MANY_REQUESTS)
+
+    def test_login_throttled_after_limit(self):
+        User.objects.create_user(email="student@example.com", password="wrong-password-guess", is_active=True)
+
+        for _ in range(2):
+            response = self.client.post(
+                reverse("login"), {"email": "student@example.com", "password": "incorrect"}
+            )
+            self.assertEqual(response.status_code, status.HTTP_401_UNAUTHORIZED)
+
+        response = self.client.post(reverse("login"), {"email": "student@example.com", "password": "incorrect"})
+        self.assertEqual(response.status_code, status.HTTP_429_TOO_MANY_REQUESTS)

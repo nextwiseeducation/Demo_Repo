@@ -23,3 +23,7 @@ db.sqlite3
 # Frontend (reserved for Milestone 3)
 node_modules/
 dist/
+
+# Markdown docs / CLAUDE project files (kept out of the pushed repo)
+*.md
+CLAUDE*

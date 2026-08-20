@@ -122,6 +122,16 @@ REST_FRAMEWORK = {
     "DEFAULT_PERMISSION_CLASSES": (
         "rest_framework.permissions.IsAuthenticated",
     ),
+    # Per-view rate limits (via ScopedRateThrottle, set on the auth views
+    # that are reachable without being logged in) — keyed by IP for
+    # anonymous requests. Prevents mass account creation, login
+    # brute-forcing, and using password-reset to spam arbitrary addresses.
+    "DEFAULT_THROTTLE_RATES": {
+        "register": "5/hour",
+        "login": "10/min",
+        "password_reset": "5/hour",
+        "password_reset_confirm": "10/hour",
+    },
 }
 
 from datetime import timedelta  # noqa: E402
