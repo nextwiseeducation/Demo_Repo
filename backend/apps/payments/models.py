@@ -8,12 +8,24 @@ class BillingInterval(models.TextChoices):
 
 
 class SubscriptionPlan(models.Model):
-    """Empty/unused in Phase 1 — table exists now so Phase 2 Stripe activation is config, not migration."""
+    """
+    Empty/unused in Phase 1 — table exists now so Phase 2 Stripe activation is config, not migration.
+
+    trial_period_days / trial_question_limit are data, not code, for the
+    client's requested trial model (a time window AND a distinct-question
+    cap, whichever is hit first) — so the exact numbers can be tuned later
+    without a deploy. Enforcement itself (checking these against
+    UserSubscription.current_period_end and a distinct-question count from
+    StudentResponseLog/QuizSession) is Phase 2 permission-check logic, not
+    a schema concern — nothing reads these fields yet.
+    """
 
     name = models.CharField(max_length=100)
     price = models.DecimalField(max_digits=8, decimal_places=2)
     interval = models.CharField(max_length=10, choices=BillingInterval.choices)
     stripe_price_id = models.CharField(max_length=255, blank=True)
+    trial_period_days = models.PositiveIntegerField(null=True, blank=True)
+    trial_question_limit = models.PositiveIntegerField(null=True, blank=True)
 
     def __str__(self):
         return f"{self.name} (${self.price}/{self.interval.lower()})"

@@ -5,7 +5,7 @@ from .models import SubscriptionPlan, UserSubscription
 
 @admin.register(SubscriptionPlan)
 class SubscriptionPlanAdmin(admin.ModelAdmin):
-    list_display = ("name", "price", "interval", "stripe_price_id")
+    list_display = ("name", "price", "interval", "trial_period_days", "trial_question_limit", "stripe_price_id")
 
 
 @admin.register(UserSubscription)
