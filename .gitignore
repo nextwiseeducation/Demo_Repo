@@ -1,0 +1,25 @@
+# Python
+__pycache__/
+*.pyc
+*.pyo
+.venv/
+*.egg-info/
+
+# Django
+backend/staticfiles/
+backend/media/
+db.sqlite3
+
+# Env / secrets
+.env
+*.env
+!.env.example
+
+# Editors / OS
+.vscode/
+.idea/
+.DS_Store
+
+# Frontend (reserved for Milestone 3)
+node_modules/
+dist/
