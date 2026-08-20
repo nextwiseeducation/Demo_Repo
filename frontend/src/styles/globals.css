@@ -1,0 +1,112 @@
+@import "tailwindcss";
+@import "tw-animate-css";
+
+@import "@fontsource/plus-jakarta-sans/400.css";
+@import "@fontsource/plus-jakarta-sans/500.css";
+@import "@fontsource/plus-jakarta-sans/600.css";
+@import "@fontsource/plus-jakarta-sans/700.css";
+@import "@fontsource/plus-jakarta-sans/800.css";
+@import "@fontsource/space-grotesk/500.css";
+@import "@fontsource/space-grotesk/600.css";
+@import "@fontsource/space-grotesk/700.css";
+@import "@fontsource/fraunces/500.css";
+@import "@fontsource/fraunces/600.css";
+
+@custom-variant dark (&:is(.dark *));
+
+/*
+ * NextWise Education brand tokens — "Direction 2: Intelligent Learning"
+ * (deep indigo + warm amber). Every raw hex lives here, once. Components
+ * should always reach for the semantic Tailwind utility (bg-primary,
+ * text-muted-foreground, ...) generated from these, never a literal hex.
+ */
+:root {
+  --background: #fafafa;
+  --foreground: #111827;
+
+  --card: #ffffff;
+  --card-foreground: #111827;
+  --popover: #ffffff;
+  --popover-foreground: #111827;
+
+  --primary: #4338ca;
+  --primary-foreground: #ffffff;
+
+  /* Soft violet tint — badges, soft buttons, subtle highlighted sections */
+  --secondary: #ede9fe;
+  --secondary-foreground: #4338ca;
+
+  /* Low-emphasis neutral surfaces (disabled states, faint divider sections) */
+  --muted: #f4f4f5;
+  --muted-foreground: #6b7280;
+
+  --accent: #d97706;
+  --accent-foreground: #ffffff;
+
+  /* Form errors, incorrect-answer feedback */
+  --destructive: #dc2626;
+  --destructive-foreground: #ffffff;
+
+  /* Correct-answer feedback (no brand spec for this — standard semantic green) */
+  --success: #16a34a;
+  --success-foreground: #ffffff;
+
+  --border: #e5e7eb;
+  --input: #e5e7eb;
+  --ring: #4338ca;
+
+  /* Secondary text on dark-indigo panels only (hero band, footer) — not a
+     general-purpose token, deliberately not aliased to anything semantic. */
+  --brand-indigo-light: #a5b4fc;
+
+  --radius: 0.625rem;
+}
+
+@theme inline {
+  --color-background: var(--background);
+  --color-foreground: var(--foreground);
+  --color-card: var(--card);
+  --color-card-foreground: var(--card-foreground);
+  --color-popover: var(--popover);
+  --color-popover-foreground: var(--popover-foreground);
+  --color-primary: var(--primary);
+  --color-primary-foreground: var(--primary-foreground);
+  --color-secondary: var(--secondary);
+  --color-secondary-foreground: var(--secondary-foreground);
+  --color-muted: var(--muted);
+  --color-muted-foreground: var(--muted-foreground);
+  --color-accent: var(--accent);
+  --color-accent-foreground: var(--accent-foreground);
+  --color-destructive: var(--destructive);
+  --color-destructive-foreground: var(--destructive-foreground);
+  --color-success: var(--success);
+  --color-success-foreground: var(--success-foreground);
+  --color-border: var(--border);
+  --color-input: var(--input);
+  --color-ring: var(--ring);
+  --color-brand-indigo-light: var(--brand-indigo-light);
+
+  --font-sans: "Plus Jakarta Sans", ui-sans-serif, system-ui, sans-serif;
+  --font-display: "Space Grotesk", ui-sans-serif, system-ui, sans-serif;
+  --font-serif: "Fraunces", ui-serif, Georgia, serif;
+
+  --radius-sm: calc(var(--radius) - 4px);
+  --radius-md: calc(var(--radius) - 2px);
+  --radius-lg: var(--radius);
+  --radius-xl: calc(var(--radius) + 4px);
+}
+
+@layer base {
+  * {
+    @apply border-border outline-ring/50;
+  }
+  body {
+    @apply bg-background text-foreground font-sans antialiased;
+  }
+  h1,
+  h2,
+  h3,
+  h4 {
+    @apply font-display;
+  }
+}

@@ -11,7 +11,12 @@ from rest_framework_simplejwt.tokens import RefreshToken
 from rest_framework_simplejwt.views import TokenObtainPairView
 
 from .emails import send_password_reset_email, send_verification_email
-from .serializers import PasswordResetConfirmSerializer, PasswordResetRequestSerializer, RegisterSerializer
+from .serializers import (
+    MeSerializer,
+    PasswordResetConfirmSerializer,
+    PasswordResetRequestSerializer,
+    RegisterSerializer,
+)
 from .tokens import read_verification_token
 
 User = get_user_model()
@@ -46,6 +51,13 @@ class VerifyEmailView(APIView):
         user.is_active = True
         user.save(update_fields=["is_active"])
         return Response({"detail": "Email verified. You can now log in."})
+
+
+class MeView(APIView):
+    permission_classes = [IsAuthenticated]
+
+    def get(self, request):
+        return Response(MeSerializer(request.user).data)
 
 
 class LoginView(TokenObtainPairView):

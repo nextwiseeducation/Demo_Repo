@@ -166,3 +166,24 @@ class ThrottlingTests(APITestCase):
 
         response = self.client.post(reverse("login"), {"email": "student@example.com", "password": "incorrect"})
         self.assertEqual(response.status_code, status.HTTP_429_TOO_MANY_REQUESTS)
+
+
+class MeTests(APITestCase):
+    def test_returns_current_user(self):
+        user = User.objects.create_user(
+            email="student@example.com", password="a-strong-password-123", full_name="Jane Student", is_active=True
+        )
+        login_response = self.client.post(
+            reverse("login"), {"email": "student@example.com", "password": "a-strong-password-123"}
+        )
+        self.client.credentials(HTTP_AUTHORIZATION=f"Bearer {login_response.data['access']}")
+
+        response = self.client.get(reverse("me"))
+        self.assertEqual(response.status_code, status.HTTP_200_OK)
+        self.assertEqual(response.data["email"], "student@example.com")
+        self.assertEqual(response.data["full_name"], "Jane Student")
+        self.assertEqual(response.data["subscription_status"], "FREE")
+
+    def test_requires_authentication(self):
+        response = self.client.get(reverse("me"))
+        self.assertEqual(response.status_code, status.HTTP_401_UNAUTHORIZED)
