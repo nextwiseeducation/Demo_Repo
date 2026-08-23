@@ -5,6 +5,16 @@ from apps.taxonomy.models import CaseStudy, ClientNeedsCategory, ClientNeedsSubc
 
 
 class QuestionType(models.TextChoices):
+    """
+    Every question format the schema is built to support, per CLAUDE.md's
+    Milestone 1 brief. Only MCQ/SATA are actually rendered by the (future)
+    quiz UI in Phase 1 — the rest (MATRIX through NGN_CASE) have their data
+    model in place now ("stubbed") specifically so 4,000+ questions across
+    all these types can be imported starting now, without waiting for
+    Phase 2's rendering UI and without a schema migration once that UI
+    exists.
+    """
+
     MCQ = "MCQ", "Multiple Choice (single answer)"
     SATA = "SATA", "Select All That Apply"
     MATRIX = "MATRIX", "Matrix/Grid"
@@ -23,6 +33,14 @@ class Difficulty(models.TextChoices):
 
 
 class ClinicalJudgmentSkill(models.TextChoices):
+    """
+    The six steps of NCSBN's Clinical Judgment Measurement Model (the
+    framework the actual NCLEX exam uses to structure Next Generation NCLEX
+    items) — tagging each question with which step it exercises is what
+    lets Phase 2's "weak area by clinical judgment skill" analytics exist
+    without re-tagging the question bank later.
+    """
+
     RECOGNIZE_CUES = "RECOGNIZE_CUES", "Recognize Cues"
     ANALYZE_CUES = "ANALYZE_CUES", "Analyze Cues"
     PRIORITIZE_HYPOTHESES = "PRIORITIZE_HYPOTHESES", "Prioritize Hypotheses"
@@ -32,6 +50,8 @@ class ClinicalJudgmentSkill(models.TextChoices):
 
 
 class CognitiveLevel(models.TextChoices):
+    """Bloom's Taxonomy levels — how deep the reasoning a question demands is, independent of clinical_judgment_skill (which measures WHERE in the CJ process the question sits, not how hard the thinking is)."""
+
     REMEMBER = "REMEMBER", "Remember"
     UNDERSTAND = "UNDERSTAND", "Understand"
     APPLY = "APPLY", "Apply"
@@ -41,27 +61,74 @@ class CognitiveLevel(models.TextChoices):
 
 
 class Question(UUIDPKMixin, TimeStampedMixin, models.Model):
+    # UUIDPKMixin: id is a UUID, not a sequential int (see apps/core/models.py)
+    # — deliberate for a table that will hold 4,000+ rows referenced
+    # externally (URLs, StudentResponseLog, quiz session state).
+    # TimeStampedMixin: adds created_at/updated_at automatically — useful
+    # for content-team auditing (when was this question added/last edited)
+    # without any extra fields defined here.
+
     question_type = models.CharField(max_length=20, choices=QuestionType.choices)
     # When question_type=NGN_CASE, ngn_type says which item-type this case
     # question renders as (a case study is a sequence of ordinary items —
     # MCQ, MATRIX, BOWTIE, etc. — sharing one clinical_scenario/case_study).
+    # null=True/blank=True: irrelevant (and left empty) for every
+    # non-NGN_CASE question, since only a case-study item needs to say
+    # "which type am I, within this case".
     ngn_type = models.CharField(max_length=20, choices=QuestionType.choices, null=True, blank=True)
 
+    # The question text itself. TextField (not CharField) — no practical
+    # length cap makes sense for exam-style question stems, some of which
+    # run several sentences.
     stem = models.TextField()
+    # The patient vignette/case context, when a question has one — separate
+    # from `stem` because in the UI these are typically displayed as two
+    # distinct blocks (a scenario panel, then the actual question below
+    # it), and not every question has a scenario (a pure knowledge-recall
+    # MCQ might not).
     clinical_scenario = models.TextField(null=True, blank=True)
+    # Links a set of questions that all share ONE clinical_scenario (an NGN
+    # Case Study is really "6 questions about the same patient") — see
+    # apps.taxonomy.CaseStudy.shared_scenario for where that shared text
+    # actually lives. null=True since only NGN_CASE questions use this;
+    # on_delete=CASCADE means deleting a CaseStudy deletes every Question
+    # that belongs to it (a case study with no case makes no sense to keep
+    # around).
     case_study = models.ForeignKey(
         CaseStudy, on_delete=models.CASCADE, null=True, blank=True, related_name="questions"
     )
+    # Where this question falls within its case study (1st item, 2nd item,
+    # ...) — needed because case-study items must be presented in a fixed
+    # order, not the arbitrary order they happen to be queried in.
     case_study_sequence = models.IntegerField(null=True, blank=True)
+    # Optional accompanying image (lab result table, diagram, EKG strip,
+    # etc.). upload_to defines the subdirectory under MEDIA_ROOT files land
+    # in; actual serving is handled by Django only when DEBUG=True (see
+    # config/urls.py) — production needs a real file host in front of this
+    # before question images can go live at scale.
     image = models.FileField(upload_to="question_images/", null=True, blank=True)
 
     difficulty = models.CharField(max_length=10, choices=Difficulty.choices)
 
+    # --- Taxonomy tagging (apps.taxonomy) ---
+    # on_delete=PROTECT (not CASCADE, unlike case_study above) is
+    # deliberate here: it should be IMPOSSIBLE to delete a NursingSystem/
+    # Topic/ClientNeedsCategory/etc. while any Question still references it
+    # — doing so would silently delete real exam content as a side effect
+    # of an admin cleaning up taxonomy data. PROTECT raises an error and
+    # blocks the delete instead, forcing a deliberate reassignment first.
     nursing_system = models.ForeignKey(NursingSystem, on_delete=models.PROTECT, related_name="questions")
     topic = models.ForeignKey(Topic, on_delete=models.PROTECT, related_name="questions")
+    # subtopic is optional (null=True) — not every question needs
+    # subtopic-level granularity, but topic/nursing_system are required.
     subtopic = models.ForeignKey(
         Subtopic, on_delete=models.PROTECT, null=True, blank=True, related_name="questions"
     )
+    # Both Client Needs fields are required (no null=True) — this is the
+    # OFFICIAL NCSBN exam blueprint categorization (unlike nursing_system,
+    # which is this project's own invented taxonomy), so every question
+    # must be classified against it for the content bank to be
+    # representative of the real exam's category weighting.
     nclex_client_needs_category = models.ForeignKey(
         ClientNeedsCategory, on_delete=models.PROTECT, related_name="questions"
     )
@@ -71,27 +138,69 @@ class Question(UUIDPKMixin, TimeStampedMixin, models.Model):
 
     clinical_judgment_skill = models.CharField(max_length=25, choices=ClinicalJudgmentSkill.choices)
     cognitive_level = models.CharField(max_length=15, choices=CognitiveLevel.choices)
+    # ManyToMany (not ForeignKey): a single question can carry several free-
+    # form tags at once (e.g. both "pediatric" and "med-math"). blank=True
+    # means a question can have zero tags — unlike the required taxonomy
+    # fields above, tagging is supplementary, not mandatory classification.
     tags = models.ManyToManyField(Tag, blank=True, related_name="questions")
 
+    # Explanation shown after the student answers, regardless of whether
+    # they got it right — required (no null=True): every question must
+    # explain why the correct answer is correct.
     rationale_correct = models.TextField()
+    # Explanation of why the distractors are wrong — optional, since not
+    # every question type has meaningfully separable "why the wrong answers
+    # are wrong" text distinct from rationale_correct (e.g. a Cloze
+    # question's blanks are more naturally explained inline).
     rationale_incorrect = models.TextField(null=True, blank=True)
+    # Citation (textbook, NCSBN test plan section, etc.) backing the
+    # rationale — optional, free text rather than a structured citation
+    # model, since Phase 1 has no requirement to parse/validate citations.
     reference = models.TextField(null=True, blank=True)
 
+    # Soft-delete flag: an inactive question is excluded from quizzes
+    # without deleting the row (and its historical StudentResponseLog
+    # entries, which reference it by ForeignKey) — lets a flawed or
+    # retired question be pulled from circulation while preserving the
+    # data trail of students who already answered it.
     is_active = models.BooleanField(default=True)
 
     class Meta:
+        # Newest questions first by default — most relevant when browsing
+        # the admin's question list (recently added/imported content is
+        # what an editor is most likely checking).
         ordering = ["-created_at"]
 
     def __str__(self):
+        # [MCQ] A client with heart failure reports weight... — truncated
+        # to 60 chars so this stays readable in the admin list/dropdowns
+        # rather than dumping an entire multi-sentence stem inline.
         return f"[{self.question_type}] {self.stem[:60]}"
 
 
 class AnswerChoice(UUIDPKMixin, models.Model):
     """Used by MCQ, SATA, and EMR — question_type controls scoring rules, not the schema."""
 
+    # No TimeStampedMixin here (unlike Question) — an individual answer
+    # choice's own creation/edit time isn't independently useful once it
+    # belongs to a timestamped Question; UUIDPKMixin is still used so each
+    # choice has a stable, externally-referenceable id (needed by
+    # StudentResponseLog.selected_choice in apps.quizzes, which records
+    # exactly which choice a student picked).
     question = models.ForeignKey(Question, on_delete=models.CASCADE, related_name="answer_choices")
     choice_text = models.TextField()
+    # No constraint enforcing "exactly one is_correct=True for MCQ" or "at
+    # least one for SATA" at the database level — that validation is
+    # question_type-dependent business logic, left to be enforced by the
+    # (future) admin import validation or serializer layer, not the schema
+    # itself. This is intentional: the same AnswerChoice model has to
+    # support MCQ's exactly-one-correct rule AND SATA's variable-number-
+    # correct rule AND EMR's rules, so no single DB constraint could
+    # capture all three anyway.
     is_correct = models.BooleanField(default=False)
+    # Explicit ordering field rather than relying on insertion/PK order —
+    # lets an editor reorder answer choices (e.g. via drag-and-drop in a
+    # future admin UI) independent of the order they were created in.
     display_order = models.IntegerField(default=0)
 
     class Meta:
@@ -102,9 +211,21 @@ class AnswerChoice(UUIDPKMixin, models.Model):
 
 
 # --- NGN stub models: schema only, no rendering logic until Phase 2 ---
+# Everything below exists so the content team can start writing NGN content
+# now and it lands in a shape the Phase 2 UI can consume directly — none of
+# it has a corresponding "take this quiz question" UI yet (that's Phase 2's
+# NGN rendering work), only Django admin CRUD via apps/questions/admin.py.
 
 
 class MatrixRow(models.Model):
+    """One row of a Matrix/Grid question (e.g. one assessment finding)."""
+
+    # No UUIDPKMixin/TimeStampedMixin on any of the NGN stub models below —
+    # unlike Question/AnswerChoice, these are never referenced by
+    # StudentResponseLog or any other cross-app relationship, so a plain
+    # auto-increment int PK (Django's default) is sufficient; there's no
+    # need for UUID unguessability or independent audit timestamps on a row
+    # that only ever exists nested under one Question in the admin.
     question = models.ForeignKey(Question, on_delete=models.CASCADE, related_name="matrix_rows")
     text = models.TextField()
     display_order = models.IntegerField(default=0)
@@ -117,7 +238,11 @@ class MatrixRow(models.Model):
 
 
 class MatrixColumn(models.Model):
+    """One column of a Matrix/Grid question (e.g. 'Expected' / 'Unexpected')."""
+
     question = models.ForeignKey(Question, on_delete=models.CASCADE, related_name="matrix_columns")
+    # CharField (not TextField, unlike MatrixRow.text) — column headers are
+    # short labels, not full sentences, so a bounded length is appropriate.
     text = models.CharField(max_length=255)
     display_order = models.IntegerField(default=0)
 
@@ -129,11 +254,16 @@ class MatrixColumn(models.Model):
 
 
 class MatrixCell(models.Model):
+    """The row x column intersection — is this combination correct?"""
+
     row = models.ForeignKey(MatrixRow, on_delete=models.CASCADE, related_name="cells")
     column = models.ForeignKey(MatrixColumn, on_delete=models.CASCADE, related_name="cells")
     is_correct = models.BooleanField(default=False)
 
     class Meta:
+        # Guarantees at most one cell per (row, column) pair — a grid can't
+        # have two different "is this correct" answers for the same
+        # intersection.
         unique_together = ("row", "column")
 
     def __str__(self):
@@ -141,6 +271,8 @@ class MatrixCell(models.Model):
 
 
 class BowTieSection(models.TextChoices):
+    """The three zones of a Bow-Tie item: a central Condition flanked by contributing Assessment findings and required Actions."""
+
     ASSESSMENT = "ASSESSMENT", "Assessment"
     CONDITION = "CONDITION", "Condition"
     ACTION = "ACTION", "Action"
@@ -148,12 +280,20 @@ class BowTieSection(models.TextChoices):
 
 class BowTieOption(models.Model):
     question = models.ForeignKey(Question, on_delete=models.CASCADE, related_name="bowtie_options")
+    # Which of the three bow-tie zones this option belongs to — a single
+    # flat list of options per question, disambiguated by this field,
+    # rather than three separate models (BowTieAssessmentOption,
+    # BowTieConditionOption, BowTieActionOption) that would otherwise be
+    # near-identical.
     section = models.CharField(max_length=15, choices=BowTieSection.choices)
     option_text = models.TextField()
     is_correct = models.BooleanField(default=False)
     display_order = models.IntegerField(default=0)
 
     class Meta:
+        # Grouped by section first (all Assessment options together, then
+        # Condition, then Action), then by display_order within each
+        # section — matches how a bow-tie diagram is actually laid out.
         ordering = ["section", "display_order"]
 
     def __str__(self):
@@ -163,12 +303,19 @@ class BowTieOption(models.Model):
 class ClozeBlank(models.Model):
     """blank_key must match a {{token}} placeholder in the parent Question.stem."""
 
+    # This is the mechanism that connects a specific blank to its position
+    # within the stem text: the content author writes something like "The
+    # nurse should first assess the client's {{blank_1}}." in Question.stem,
+    # and blank_key="blank_1" here is what a renderer would match against
+    # that placeholder to know where to insert a dropdown.
     question = models.ForeignKey(Question, on_delete=models.CASCADE, related_name="cloze_blanks")
     blank_key = models.CharField(max_length=50)
     display_order = models.IntegerField(default=0)
 
     class Meta:
         ordering = ["display_order"]
+        # A given question can't define the same blank_key twice — each
+        # placeholder token must uniquely identify one ClozeBlank.
         unique_together = ("question", "blank_key")
 
     def __str__(self):
@@ -176,15 +323,23 @@ class ClozeBlank(models.Model):
 
 
 class ClozeOption(models.Model):
+    """One dropdown choice for a single ClozeBlank."""
+
     blank = models.ForeignKey(ClozeBlank, on_delete=models.CASCADE, related_name="options")
     option_text = models.CharField(max_length=255)
     is_correct = models.BooleanField(default=False)
 
+    # No display_order here (unlike most other option/choice models in this
+    # file) — dropdown options are typically presented alphabetically or in
+    # authoring order without needing manual reordering; can be added later
+    # without breaking existing data if that assumption turns out wrong.
     def __str__(self):
         return self.option_text
 
 
 class DragDropCategory(models.Model):
+    """One 'bucket' items can be sorted into (used by the sort-into-categories drag-drop variant)."""
+
     question = models.ForeignKey(Question, on_delete=models.CASCADE, related_name="dragdrop_categories")
     name = models.CharField(max_length=150)
     display_order = models.IntegerField(default=0)
@@ -206,9 +361,19 @@ class DragDropItem(models.Model):
     question = models.ForeignKey(Question, on_delete=models.CASCADE, related_name="dragdrop_items")
     text = models.TextField()
     display_order = models.IntegerField(default=0)
+    # Used only by the "sort into categories" variant — which
+    # DragDropCategory this item is supposed to end up in. null/blank so it
+    # can be left empty for the sequencing variant.
     correct_category = models.ForeignKey(
         DragDropCategory, on_delete=models.CASCADE, null=True, blank=True, related_name="items"
     )
+    # Used only by the "put these in the correct order" variant — this
+    # item's correct position (1st, 2nd, 3rd...). null/blank so it can be
+    # left empty for the categorization variant. Deliberately not the same
+    # field as display_order above: display_order controls how items are
+    # initially presented to the student (e.g. shuffled or fixed starting
+    # order), while correct_order is the answer key for where they should
+    # end up.
     correct_order = models.IntegerField(null=True, blank=True)
 
     class Meta:
@@ -229,6 +394,10 @@ class HotSpotTarget(models.Model):
     """
 
     question = models.ForeignKey(Question, on_delete=models.CASCADE, related_name="hotspot_targets")
+    # The exact word/phrase (as it appears in stem/clinical_scenario) that
+    # is one of the selectable options — a renderer would need to locate
+    # this substring within the text to make it clickable, rather than
+    # this model storing a position/offset directly.
     target_text = models.CharField(max_length=255)
     is_correct = models.BooleanField(default=False)
     display_order = models.IntegerField(default=0)
