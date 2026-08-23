@@ -63,7 +63,7 @@ function QuizSessionInner({ questions }: { questions: Question[] }) {
       <QuizProgressBar currentIndex={session.currentIndex} total={session.questions.length} />
 
       {isSupported ? (
-        <QuestionCard question={question}>
+        <QuestionCard question={question} questionNumber={session.currentIndex + 1}>
           {question.question_type === "MCQ" ? (
             <MCQChoiceList
               choices={question.answer_choices}

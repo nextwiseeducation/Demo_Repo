@@ -1,4 +1,5 @@
-import { CheckCircle2, Info, XCircle } from "lucide-react";
+import { CheckCircle2, Info, MessageSquareText, XCircle } from "lucide-react";
+import { useState } from "react";
 import { Link, Navigate, useLocation } from "react-router-dom";
 
 import {
@@ -10,7 +11,9 @@ import {
 import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
 import { Card, CardContent } from "@/components/ui/card";
+import { QuizFeedbackModal } from "@/features/quiz/components/QuizFeedbackModal";
 import { RationalePanel } from "@/features/quiz/components/RationalePanel";
+import { ReportIssueDialog } from "@/features/quiz/components/ReportIssueDialog";
 import { ROUTES } from "@/lib/constants";
 import type { Question } from "@/types/question";
 import type { QuestionResponse } from "@/types/quiz";
@@ -23,6 +26,9 @@ interface LocationState {
 export function QuizResultsPage() {
   const location = useLocation();
   const state = location.state as LocationState | null;
+  // Opens automatically as soon as the results page is reached — this IS
+  // the "end of quiz" moment the survey is meant to appear at.
+  const [feedbackOpen, setFeedbackOpen] = useState(true);
 
   if (!state?.responses?.length) {
     return <Navigate to={ROUTES.quizSetup} replace />;
@@ -34,6 +40,8 @@ export function QuizResultsPage() {
 
   return (
     <div className="mx-auto flex max-w-2xl flex-col gap-6">
+      <QuizFeedbackModal open={feedbackOpen} onOpenChange={setFeedbackOpen} questionCount={responses.length} />
+
       <div className="rounded-xl border border-accent/30 bg-accent/10 px-4 py-3 text-sm text-foreground/90">
         <div className="flex items-start gap-2">
           <Info className="mt-0.5 h-4 w-4 shrink-0 text-accent" />
@@ -42,11 +50,17 @@ export function QuizResultsPage() {
       </div>
 
       <Card>
-        <CardContent className="flex flex-col items-center gap-2 py-8 text-center">
+        <CardContent className="flex flex-col items-center gap-3 py-8 text-center">
           <p className="font-display text-4xl font-semibold text-foreground">
             {correctCount}/{responses.length}
           </p>
           <p className="text-sm text-muted-foreground">{percent}% correct</p>
+          {!feedbackOpen && (
+            <Button variant="outline" size="sm" className="gap-1.5" onClick={() => setFeedbackOpen(true)}>
+              <MessageSquareText className="h-3.5 w-3.5" />
+              Give feedback
+            </Button>
+          )}
         </CardContent>
       </Card>
 
@@ -92,6 +106,9 @@ export function QuizResultsPage() {
                     })}
                   </ul>
                   <RationalePanel question={question} wasCorrect={response.is_correct} />
+                  <div className="flex w-full justify-end">
+                    <ReportIssueDialog questionStem={question.stem} questionNumber={index + 1} />
+                  </div>
                 </AccordionContent>
               </AccordionItem>
             );

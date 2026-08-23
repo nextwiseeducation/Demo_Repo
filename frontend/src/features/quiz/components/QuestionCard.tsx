@@ -2,9 +2,19 @@ import type { ReactNode } from "react";
 
 import { Badge } from "@/components/ui/badge";
 import { Card, CardContent, CardHeader } from "@/components/ui/card";
+import { ReportIssueDialog } from "@/features/quiz/components/ReportIssueDialog";
 import { DIFFICULTY_LABELS, QUESTION_TYPE_LABELS, type Question } from "@/types/question";
 
-export function QuestionCard({ question, children }: { question: Question; children?: ReactNode }) {
+export function QuestionCard({
+  question,
+  questionNumber,
+  children,
+}: {
+  question: Question;
+  /** Position within the current quiz (1-based) — shown on the issue report so students never have to remember it themselves. */
+  questionNumber?: number;
+  children?: ReactNode;
+}) {
   return (
     <Card className="border-border/80 shadow-sm">
       <CardHeader className="flex flex-col gap-3">
@@ -24,6 +34,10 @@ export function QuestionCard({ question, children }: { question: Question; child
         )}
 
         <p className="text-base leading-relaxed font-medium text-foreground">{question.stem}</p>
+
+        <div className="flex w-full justify-end">
+          <ReportIssueDialog questionStem={question.stem} questionNumber={questionNumber} />
+        </div>
       </CardHeader>
       {children && <CardContent className="flex flex-col gap-2">{children}</CardContent>}
     </Card>
