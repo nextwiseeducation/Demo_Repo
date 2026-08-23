@@ -6,6 +6,11 @@ import type { Question } from "@/types/question";
  * real /api/questions/ response later is a drop-in, not a rewrite. Only
  * MCQ/SATA render interactively right now; other types below exist purely
  * to prove the "coming soon" notice renders instead of crashing.
+ *
+ * rationale_correct/rationale_incorrect are left null on q1-q3 deliberately
+ * — each answer_choice below carries its own `rationale` instead, shown
+ * inline under that option (client-requested Aug 2026), which is what the
+ * quiz UI actually renders for MCQ/SATA now.
  */
 export const MOCK_QUESTIONS: Question[] = [
   {
@@ -19,15 +24,38 @@ export const MOCK_QUESTIONS: Question[] = [
     topic: "Heart Failure",
     nclex_client_needs_category: "Physiological Adaptation",
     clinical_judgment_skill: "Take Action",
-    rationale_correct:
-      "A rapid weight gain of 2-3 lbs in a day, or 5 lbs in a week, is a key indicator of fluid retention in heart failure and should be reported to the provider immediately, since it often precedes a decompensation episode.",
-    rationale_incorrect:
-      "Restricting fluids without provider guidance and simply documenting the finding both delay an intervention that may already be needed.",
+    rationale_correct: null,
+    rationale_incorrect: null,
     answer_choices: [
-      { id: "q1c1", choice_text: "Notify the provider", is_correct: true, display_order: 1 },
-      { id: "q1c2", choice_text: "Restrict the client's fluids to 500 mL/day", is_correct: false, display_order: 2 },
-      { id: "q1c3", choice_text: "Document the finding and reassess in a week", is_correct: false, display_order: 3 },
-      { id: "q1c4", choice_text: "Advise the client to elevate their legs", is_correct: false, display_order: 4 },
+      {
+        id: "q1c1",
+        choice_text: "Notify the provider",
+        is_correct: true,
+        display_order: 1,
+        rationale:
+          "A rapid weight gain of 2-3 lbs in a day, or 5 lbs in a week, is a key indicator of fluid retention in heart failure and should be reported to the provider immediately, since it often precedes a decompensation episode.",
+      },
+      {
+        id: "q1c2",
+        choice_text: "Restrict the client's fluids to 500 mL/day",
+        is_correct: false,
+        display_order: 2,
+        rationale: "Fluid restriction requires a provider order — a nurse should not independently impose one, and doing so delays notifying the provider of a finding that needs immediate attention.",
+      },
+      {
+        id: "q1c3",
+        choice_text: "Document the finding and reassess in a week",
+        is_correct: false,
+        display_order: 3,
+        rationale: "Waiting a week delays intervention for a finding that often precedes decompensation — this weight gain needs same-day follow-up, not routine documentation.",
+      },
+      {
+        id: "q1c4",
+        choice_text: "Advise the client to elevate their legs",
+        is_correct: false,
+        display_order: 4,
+        rationale: "Leg elevation may help with peripheral edema but does nothing for the underlying fluid retention driving the weight gain, and doesn't address the need to notify the provider.",
+      },
     ],
   },
   {
@@ -40,15 +68,44 @@ export const MOCK_QUESTIONS: Question[] = [
     topic: "Cardiac Glycosides",
     nclex_client_needs_category: "Pharmacological Therapies",
     clinical_judgment_skill: "Recognize Cues",
-    rationale_correct:
-      "Nausea, visual disturbances (yellow-green halos), and bradycardia are classic signs of digoxin toxicity caused by the drug's narrow therapeutic index.",
-    rationale_incorrect: "Hypertension and increased appetite are not associated with digoxin toxicity.",
+    rationale_correct: null,
+    rationale_incorrect: null,
     answer_choices: [
-      { id: "q2c1", choice_text: "Nausea", is_correct: true, display_order: 1 },
-      { id: "q2c2", choice_text: "Yellow-green visual halos", is_correct: true, display_order: 2 },
-      { id: "q2c3", choice_text: "Bradycardia", is_correct: true, display_order: 3 },
-      { id: "q2c4", choice_text: "Hypertension", is_correct: false, display_order: 4 },
-      { id: "q2c5", choice_text: "Increased appetite", is_correct: false, display_order: 5 },
+      {
+        id: "q2c1",
+        choice_text: "Nausea",
+        is_correct: true,
+        display_order: 1,
+        rationale: "Gastrointestinal symptoms, especially nausea and anorexia, are among the earliest signs of digoxin toxicity.",
+      },
+      {
+        id: "q2c2",
+        choice_text: "Yellow-green visual halos",
+        is_correct: true,
+        display_order: 2,
+        rationale: "Visual disturbances, classically yellow-green halos around lights, are a hallmark sign of digoxin toxicity caused by the drug's effect on the optic pathway.",
+      },
+      {
+        id: "q2c3",
+        choice_text: "Bradycardia",
+        is_correct: true,
+        display_order: 3,
+        rationale: "Digoxin's therapeutic effect slows AV conduction — at toxic levels this can progress to a dangerous bradycardia or heart block.",
+      },
+      {
+        id: "q2c4",
+        choice_text: "Hypertension",
+        is_correct: false,
+        display_order: 4,
+        rationale: "Digoxin toxicity is associated with dysrhythmias, not elevated blood pressure — hypertension isn't a recognized toxicity sign.",
+      },
+      {
+        id: "q2c5",
+        choice_text: "Increased appetite",
+        is_correct: false,
+        display_order: 5,
+        rationale: "Toxicity causes anorexia and nausea, the opposite of increased appetite.",
+      },
     ],
   },
   {
@@ -61,14 +118,37 @@ export const MOCK_QUESTIONS: Question[] = [
     topic: "Diabetes Mellitus",
     nclex_client_needs_category: "Physiological Adaptation",
     clinical_judgment_skill: "Generate Solutions",
-    rationale_correct:
-      "A blood glucose of 52 mg/dL with symptomatic hypoglycemia requires immediate treatment with a fast-acting carbohydrate before any other action.",
-    rationale_incorrect: "Rechecking in 30 minutes or calling the provider first both delay urgently needed treatment.",
+    rationale_correct: null,
+    rationale_incorrect: null,
     answer_choices: [
-      { id: "q3c1", choice_text: "Give 15-20 g of a fast-acting carbohydrate", is_correct: true, display_order: 1 },
-      { id: "q3c2", choice_text: "Recheck the blood glucose in 30 minutes", is_correct: false, display_order: 2 },
-      { id: "q3c3", choice_text: "Administer the client's scheduled insulin dose", is_correct: false, display_order: 3 },
-      { id: "q3c4", choice_text: "Call the provider before intervening", is_correct: false, display_order: 4 },
+      {
+        id: "q3c1",
+        choice_text: "Give 15-20 g of a fast-acting carbohydrate",
+        is_correct: true,
+        display_order: 1,
+        rationale: "A blood glucose of 52 mg/dL with symptomatic hypoglycemia requires immediate treatment with a fast-acting carbohydrate before any other action.",
+      },
+      {
+        id: "q3c2",
+        choice_text: "Recheck the blood glucose in 30 minutes",
+        is_correct: false,
+        display_order: 2,
+        rationale: "Rechecking without treating first delays urgently needed carbohydrate for a client who is already symptomatic.",
+      },
+      {
+        id: "q3c3",
+        choice_text: "Administer the client's scheduled insulin dose",
+        is_correct: false,
+        display_order: 3,
+        rationale: "Giving insulin during hypoglycemia would lower blood glucose further and worsen the client's condition.",
+      },
+      {
+        id: "q3c4",
+        choice_text: "Call the provider before intervening",
+        is_correct: false,
+        display_order: 4,
+        rationale: "Symptomatic hypoglycemia is treated immediately under standing protocol — calling the provider first delays urgently needed treatment.",
+      },
     ],
   },
   {
@@ -81,7 +161,7 @@ export const MOCK_QUESTIONS: Question[] = [
     topic: "Thyroid Surgery",
     nclex_client_needs_category: "Reduction of Risk Potential",
     clinical_judgment_skill: "Analyze Cues",
-    rationale_correct: "",
+    rationale_correct: null,
     rationale_incorrect: null,
     answer_choices: [],
   },

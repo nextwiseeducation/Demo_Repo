@@ -5,7 +5,6 @@ import { Button } from "@/components/ui/button";
 import { MCQChoiceList } from "@/features/quiz/components/MCQChoiceList";
 import { QuestionCard } from "@/features/quiz/components/QuestionCard";
 import { QuizProgressBar } from "@/features/quiz/components/QuizProgressBar";
-import { RationalePanel } from "@/features/quiz/components/RationalePanel";
 import { SATAChoiceList } from "@/features/quiz/components/SATAChoiceList";
 import { UnsupportedQuestionTypeNotice } from "@/features/quiz/components/UnsupportedQuestionTypeNotice";
 import { createInitialState, isAnswerCorrect, quizSessionReducer } from "@/features/quiz/quizSessionReducer";
@@ -82,10 +81,6 @@ function QuizSessionInner({ questions }: { questions: Question[] }) {
         </QuestionCard>
       ) : (
         <UnsupportedQuestionTypeNotice questionType={question.question_type} onSkip={goNextOrFinish} />
-      )}
-
-      {isSupported && submitted && (
-        <RationalePanel question={question} />
       )}
 
       {isSupported && (

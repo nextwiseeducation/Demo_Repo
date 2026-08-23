@@ -12,7 +12,6 @@ import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
 import { Card, CardContent } from "@/components/ui/card";
 import { QuizFeedbackModal } from "@/features/quiz/components/QuizFeedbackModal";
-import { RationalePanel } from "@/features/quiz/components/RationalePanel";
 import { ReportIssueDialog } from "@/features/quiz/components/ReportIssueDialog";
 import { ROUTES } from "@/lib/constants";
 import type { Question } from "@/types/question";
@@ -85,27 +84,28 @@ export function QuizResultsPage() {
                   </div>
                 </AccordionTrigger>
                 <AccordionContent className="flex flex-col gap-3 pb-4">
-                  <ul className="flex flex-col gap-1.5 text-sm">
+                  <ul className="flex flex-col gap-2.5 text-sm">
                     {question.answer_choices.map((choice) => {
                       const wasSelected = response.selected_choice_ids.includes(choice.id);
                       return (
-                        <li
-                          key={choice.id}
-                          className={
-                            choice.is_correct
-                              ? "font-medium text-success"
-                              : wasSelected
-                                ? "font-medium text-destructive"
-                                : "text-muted-foreground"
-                          }
-                        >
-                          {choice.choice_text}
-                          {wasSelected && !choice.is_correct && " (your answer)"}
+                        <li key={choice.id} className="flex flex-col gap-1">
+                          <span
+                            className={
+                              choice.is_correct
+                                ? "font-medium text-success"
+                                : wasSelected
+                                  ? "font-medium text-destructive"
+                                  : "text-muted-foreground"
+                            }
+                          >
+                            {choice.choice_text}
+                            {wasSelected && !choice.is_correct && " (your answer)"}
+                          </span>
+                          {choice.rationale && <span className="text-muted-foreground">{choice.rationale}</span>}
                         </li>
                       );
                     })}
                   </ul>
-                  <RationalePanel question={question} />
                   <div className="flex w-full justify-end">
                     <ReportIssueDialog questionStem={question.stem} questionNumber={index + 1} />
                   </div>

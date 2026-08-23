@@ -53,6 +53,7 @@ class AnswerChoiceAdmin(admin.ModelAdmin):
     # ALL questions at once — e.g. to audit every choice marked correct.
     list_display = ("__str__", "question", "is_correct", "display_order")
     list_filter = ("is_correct",)
+    search_fields = ("choice_text", "rationale")
 
 
 @admin.register(MatrixRow)

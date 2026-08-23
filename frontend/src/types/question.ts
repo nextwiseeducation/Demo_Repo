@@ -37,6 +37,8 @@ export interface AnswerChoice {
   choice_text: string;
   is_correct: boolean;
   display_order: number;
+  /** Shown inline directly under this option once the student submits — the primary explanation mechanism for MCQ/SATA, not a single combined blob. */
+  rationale?: string;
 }
 
 export interface Question {
@@ -49,7 +51,8 @@ export interface Question {
   topic: string;
   nclex_client_needs_category: string;
   clinical_judgment_skill: string;
-  rationale_correct: string;
+  /** Question-level fallback rationale — superseded by AnswerChoice.rationale for MCQ/SATA/EMR, only still meaningful for non-choice-based question types. */
+  rationale_correct: string | null;
   rationale_incorrect: string | null;
   answer_choices: AnswerChoice[];
 }

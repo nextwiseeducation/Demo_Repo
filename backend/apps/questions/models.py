@@ -144,14 +144,17 @@ class Question(UUIDPKMixin, TimeStampedMixin, models.Model):
     # fields above, tagging is supplementary, not mandatory classification.
     tags = models.ManyToManyField(Tag, blank=True, related_name="questions")
 
-    # Explanation shown after the student answers, regardless of whether
-    # they got it right — required (no null=True): every question must
-    # explain why the correct answer is correct.
-    rationale_correct = models.TextField()
-    # Explanation of why the distractors are wrong — optional, since not
-    # every question type has meaningfully separable "why the wrong answers
-    # are wrong" text distinct from rationale_correct (e.g. a Cloze
-    # question's blanks are more naturally explained inline).
+    # A single, question-level explanation of the correct answer — no
+    # longer required (previously was) now that AnswerChoice.rationale
+    # gives MCQ/SATA/EMR questions a per-choice explanation instead. Still
+    # useful for question types with no per-choice structure to hang a
+    # rationale off (Cloze, Hot Spot, etc.), and left populated on older
+    # content rather than migrated away.
+    rationale_correct = models.TextField(null=True, blank=True)
+    # Explanation of why the distractors are wrong, as a single blob rather
+    # than split per choice — same transitional/non-choice-based role as
+    # rationale_correct above, superseded by AnswerChoice.rationale for
+    # MCQ/SATA/EMR.
     rationale_incorrect = models.TextField(null=True, blank=True)
     # Citation (textbook, NCSBN test plan section, etc.) backing the
     # rationale — optional, free text rather than a structured citation
@@ -202,6 +205,16 @@ class AnswerChoice(UUIDPKMixin, models.Model):
     # lets an editor reorder answer choices (e.g. via drag-and-drop in a
     # future admin UI) independent of the order they were created in.
     display_order = models.IntegerField(default=0)
+    # Per-choice explanation, shown inline directly under this option once
+    # the student submits — this is the primary rationale mechanism for
+    # MCQ/SATA/EMR questions (client-requested Aug 2026), not just an
+    # explanation for the correct answer with a separate generic blurb
+    # about the rest. blank=True since older/imported content may not have
+    # this filled in per choice yet; Question.rationale_correct/
+    # rationale_incorrect (below) still exist for that transitional case
+    # and for non-choice-based NGN types, but are no longer what the
+    # MCQ/SATA quiz UI actually renders.
+    rationale = models.TextField(blank=True)
 
     class Meta:
         ordering = ["display_order"]

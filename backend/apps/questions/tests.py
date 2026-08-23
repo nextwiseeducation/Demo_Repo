@@ -96,3 +96,33 @@ class AnswerChoiceTests(TestCase):
         AnswerChoice.objects.create(question=question, choice_text="Wrong", is_correct=False, display_order=3)
 
         self.assertEqual(question.answer_choices.filter(is_correct=True).count(), 2)
+
+    def test_rationale_is_optional_but_can_be_set_per_choice(self):
+        # Each choice carries its own explanation (shown inline under that
+        # option in the quiz UI) rather than relying on a single
+        # question-level blob — confirms the field defaults to empty
+        # (older/imported content may not have it yet) and holds a real
+        # value when a choice does provide one.
+        question = make_question()
+        without_rationale = AnswerChoice.objects.create(question=question, choice_text="No explanation yet")
+        with_rationale = AnswerChoice.objects.create(
+            question=question,
+            choice_text="Notify the provider",
+            is_correct=True,
+            rationale="Rapid weight gain indicates fluid retention and should be reported immediately.",
+        )
+
+        self.assertEqual(without_rationale.rationale, "")
+        self.assertEqual(
+            with_rationale.rationale,
+            "Rapid weight gain indicates fluid retention and should be reported immediately.",
+        )
+
+    def test_question_rationale_correct_accepts_null(self):
+        # rationale_correct was previously NOT NULL at the database level —
+        # explicitly setting it to None would have raised an IntegrityError.
+        # Now that AnswerChoice.rationale is the primary explanation
+        # mechanism for MCQ/SATA/EMR questions, this must be genuinely
+        # optional, not just "blank at the form layer."
+        question = make_question(rationale_correct=None)
+        self.assertIsNone(question.rationale_correct)
