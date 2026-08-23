@@ -220,13 +220,20 @@ SIMPLE_JWT = {
 }
 
 
-# CORS — only FRONTEND_URL is ever allowed to call this API cross-origin.
-# In local dev this setting exists but is never exercised (Vite's proxy
-# makes browser requests same-origin instead); in staging/prod the React
-# app is deployed as a separate Render static site with its own origin, so
+# CORS — which browser origins may call this API cross-origin. In local
+# dev this setting exists but is never exercised (Vite's proxy makes
+# browser requests same-origin instead); in staging/prod the React app is
+# deployed as a separate Render static site with its own origin, so
 # without this, the browser would block every request before it left the
 # frontend.
-CORS_ALLOWED_ORIGINS = [FRONTEND_URL]
+#
+# A separate, explicit list rather than just [FRONTEND_URL]: FRONTEND_URL
+# is the one canonical URL used to build email links, but CORS sometimes
+# needs to trust more than one origin at once — e.g. both a custom domain
+# and the original *.onrender.com URL during DNS cutover, so the site
+# doesn't break for anyone still on the old link while DNS propagates.
+# Defaults to just FRONTEND_URL when this isn't set separately.
+CORS_ALLOWED_ORIGINS = env.list("CORS_ALLOWED_ORIGINS", default=[FRONTEND_URL])
 
 
 # Email — SendGrid via Anymail. EMAIL_BACKEND itself is set per-environment
