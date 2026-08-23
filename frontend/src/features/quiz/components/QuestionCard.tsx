@@ -8,11 +8,14 @@ import { DIFFICULTY_LABELS, QUESTION_TYPE_LABELS, type Question } from "@/types/
 export function QuestionCard({
   question,
   questionNumber,
+  showReportButton = true,
   children,
 }: {
   question: Question;
   /** Position within the current quiz (1-based) — shown on the issue report so students never have to remember it themselves. */
   questionNumber?: number;
+  /** False for decorative/non-interactive usages (e.g. the landing page's hero mockup) — there's no real quiz to report an issue against there. */
+  showReportButton?: boolean;
   children?: ReactNode;
 }) {
   return (
@@ -35,9 +38,11 @@ export function QuestionCard({
 
         <p className="text-base leading-relaxed font-medium text-foreground">{question.stem}</p>
 
-        <div className="flex w-full justify-end">
-          <ReportIssueDialog questionStem={question.stem} questionNumber={questionNumber} />
-        </div>
+        {showReportButton && (
+          <div className="flex w-full justify-end">
+            <ReportIssueDialog questionStem={question.stem} questionNumber={questionNumber} />
+          </div>
+        )}
       </CardHeader>
       {children && <CardContent className="flex flex-col gap-2">{children}</CardContent>}
     </Card>

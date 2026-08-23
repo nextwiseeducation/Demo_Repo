@@ -124,7 +124,7 @@ export function LandingPage() {
           </div>
 
           <div className="lg:pl-6">
-            <QuestionCard question={MOCK_QUESTIONS[0]}>
+            <QuestionCard question={MOCK_QUESTIONS[0]} showReportButton={false}>
               <MCQChoiceList
                 choices={MOCK_QUESTIONS[0].answer_choices}
                 selectedId={MOCK_QUESTIONS[0].answer_choices[0].id}
