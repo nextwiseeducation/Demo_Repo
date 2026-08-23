@@ -9,7 +9,11 @@ import { RegisterPage } from "@/features/auth/pages/RegisterPage";
 import { ResetPasswordPage } from "@/features/auth/pages/ResetPasswordPage";
 import { VerifyEmailPage } from "@/features/auth/pages/VerifyEmailPage";
 import { DashboardPage } from "@/features/dashboard/pages/DashboardPage";
+import { AccessibilityPage } from "@/features/marketing/pages/AccessibilityPage";
+import { FaqPage } from "@/features/marketing/pages/FaqPage";
 import { LandingPage } from "@/features/marketing/pages/LandingPage";
+import { PrivacyPolicyPage } from "@/features/marketing/pages/PrivacyPolicyPage";
+import { TermsAndConditionsPage } from "@/features/marketing/pages/TermsAndConditionsPage";
 import { QuizResultsPage } from "@/features/quiz/pages/QuizResultsPage";
 import { QuizSessionPage } from "@/features/quiz/pages/QuizSessionPage";
 import { QuizSetupPage } from "@/features/quiz/pages/QuizSetupPage";
@@ -19,7 +23,13 @@ import { PublicOnlyRoute } from "@/routes/PublicOnlyRoute";
 export const router = createBrowserRouter([
   {
     element: <MarketingLayout />,
-    children: [{ path: "/", element: <LandingPage /> }],
+    children: [
+      { path: "/", element: <LandingPage /> },
+      { path: "/privacy-policy", element: <PrivacyPolicyPage /> },
+      { path: "/terms-and-conditions", element: <TermsAndConditionsPage /> },
+      { path: "/accessibility", element: <AccessibilityPage /> },
+      { path: "/faq", element: <FaqPage /> },
+    ],
   },
   {
     element: <AuthLayout />,

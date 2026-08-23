@@ -9,4 +9,8 @@ export const ROUTES = {
   quizSetup: "/quiz",
   quizSession: "/quiz/session",
   quizResults: "/quiz/results",
+  privacyPolicy: "/privacy-policy",
+  termsAndConditions: "/terms-and-conditions",
+  accessibility: "/accessibility",
+  faq: "/faq",
 } as const;

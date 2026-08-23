@@ -1,5 +1,5 @@
 import { LogOut, User } from "lucide-react";
-import { NavLink, Outlet, useNavigate } from "react-router-dom";
+import { Link, NavLink, Outlet, useNavigate } from "react-router-dom";
 
 import { Logo } from "@/components/common/Logo";
 import { Badge } from "@/components/ui/badge";
@@ -32,7 +32,7 @@ export function AppShell() {
   }
 
   return (
-    <div className="min-h-screen bg-background">
+    <div className="flex min-h-screen flex-col bg-background">
       <header className="sticky top-0 z-40 border-b border-border/70 bg-background/85 backdrop-blur">
         <div className="mx-auto flex h-16 max-w-6xl items-center justify-between px-6">
           <div className="flex items-center gap-8">
@@ -70,9 +70,29 @@ export function AppShell() {
         </div>
       </header>
 
-      <main className="mx-auto max-w-6xl px-6 py-10">
+      <main className="mx-auto w-full max-w-6xl flex-1 px-6 py-10">
         <Outlet />
       </main>
+
+      <footer className="mt-auto bg-primary py-6">
+        <div className="mx-auto flex max-w-6xl flex-col items-center gap-2 px-6 text-xs text-[color:var(--brand-indigo-light)] sm:flex-row sm:justify-between">
+          <p>© {new Date().getFullYear()} NextWise Education. All rights reserved.</p>
+          <nav className="flex items-center gap-4">
+            <Link to={ROUTES.faq} className="hover:text-white">
+              FAQ
+            </Link>
+            <Link to={ROUTES.privacyPolicy} className="hover:text-white">
+              Privacy Policy
+            </Link>
+            <Link to={ROUTES.termsAndConditions} className="hover:text-white">
+              Terms and Conditions
+            </Link>
+            <Link to={ROUTES.accessibility} className="hover:text-white">
+              Accessibility
+            </Link>
+          </nav>
+        </div>
+      </footer>
     </div>
   );
 }
