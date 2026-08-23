@@ -42,20 +42,15 @@ services:
         sync: false
       - key: DJANGO_SUPERUSER_PASSWORD
         sync: false
-      # The canonical frontend URL, used to build links in emails
-      # (verification, password reset). Custom domain, not the Render
-      # static site's own *.onrender.com URL — see CORS_ALLOWED_ORIGINS
-      # below for why both still need to work during DNS cutover.
+      # The canonical frontend URL — used both to build links in emails
+      # (verification, password reset) and, via CORS_ALLOWED_ORIGINS'
+      # default in config/settings/base.py, as the one origin the API
+      # trusts. nextwise-frontend.onrender.com was trusted here too during
+      # the DNS cutover to the custom domain; now that it's confirmed
+      # working end-to-end and the Render subdomain is disabled on the
+      # frontend service, that fallback has been dropped.
       - key: FRONTEND_URL
         value: https://nextwiseeducation.com
-      # Both origins stay trusted during DNS propagation (up to ~48h) —
-      # the custom domain won't resolve until the client's Namecheap DNS
-      # records propagate, so the site must keep working at the original
-      # nextwise-frontend.onrender.com URL in the meantime. Once the
-      # custom domain is confirmed working end-to-end, the onrender.com
-      # entry can be dropped.
-      - key: CORS_ALLOWED_ORIGINS
-        value: https://nextwiseeducation.com,https://nextwise-frontend.onrender.com
       - key: PYTHON_VERSION
         value: 3.13.12
 
