@@ -42,7 +42,8 @@ DEBUG = env.bool("DEBUG", default=False)
 ALLOWED_HOSTS = env.list("ALLOWED_HOSTS", default=[])
 
 # Used to build links in emails (verification, password reset) that point
-# at the React frontend rather than the API itself.
+# at the React frontend rather than the API itself, and (below) to tell
+# CORS which browser origin is allowed to call this API.
 FRONTEND_URL = env("FRONTEND_URL", default="http://localhost:5173")
 
 
@@ -55,6 +56,7 @@ INSTALLED_APPS = [
     "django.contrib.messages",  # one-time flash messages, required by the admin UI
     "django.contrib.staticfiles",  # collects/serves admin CSS/JS and any app static assets; whitenoise serves what it collects
     # --- Third-party ---
+    "corsheaders",  # lets the browser-hosted React frontend (a different Render origin in staging/prod) call this API at all — without it, the browser blocks every cross-origin fetch before it reaches Django. Not needed in local dev, where Vite's proxy (vite.config.ts) makes requests same-origin instead.
     "rest_framework",  # Django REST Framework — turns Django into a JSON API (serializers, viewsets, browsable API)
     "rest_framework_simplejwt.token_blacklist",  # stores blacklisted refresh tokens in the DB; required because SIMPLE_JWT below has BLACKLIST_AFTER_ROTATION=True (logout/rotation needs somewhere to record "this token is now dead")
     "anymail",  # provider-agnostic transactional email backend; lets EMAIL_BACKEND point at SendGrid in prod without SendGrid-specific code elsewhere (see the Email section below)
@@ -73,6 +75,7 @@ INSTALLED_APPS = [
 MIDDLEWARE = [
     "django.middleware.security.SecurityMiddleware",  # HTTPS/HSTS-related headers; several of its behaviors are toggled on in production.py
     "whitenoise.middleware.WhiteNoiseMiddleware",  # serves collected static files directly from the Django/gunicorn process on Render, no separate static file host needed — must sit right after SecurityMiddleware per whitenoise's own docs
+    "corsheaders.middleware.CorsMiddleware",  # must sit as high as practical, and specifically before CommonMiddleware, per django-cors-headers' own docs — it needs to attach CORS headers to a request/response before other middleware can short-circuit it
     "django.contrib.sessions.middleware.SessionMiddleware",  # attaches request.session; needed for Django admin login, not used by the JWT API itself
     "django.middleware.common.CommonMiddleware",  # misc conveniences (e.g. APPEND_SLASH)
     "django.middleware.csrf.CsrfViewMiddleware",  # CSRF protection for session-authenticated (cookie-based) requests — i.e. the admin site; the JWT API is exempt in practice since it doesn't use cookies
@@ -215,6 +218,15 @@ SIMPLE_JWT = {
     "ROTATE_REFRESH_TOKENS": True,  # every refresh call issues a brand-new refresh token instead of reusing the same one — limits how long a stolen refresh token stays valid
     "BLACKLIST_AFTER_ROTATION": True,  # the old refresh token is invalidated the moment it's used to rotate — requires the token_blacklist app (INSTALLED_APPS above) to store the blacklist; also what makes logout actually revoke a refresh token rather than just discarding it client-side
 }
+
+
+# CORS — only FRONTEND_URL is ever allowed to call this API cross-origin.
+# In local dev this setting exists but is never exercised (Vite's proxy
+# makes browser requests same-origin instead); in staging/prod the React
+# app is deployed as a separate Render static site with its own origin, so
+# without this, the browser would block every request before it left the
+# frontend.
+CORS_ALLOWED_ORIGINS = [FRONTEND_URL]
 
 
 # Email — SendGrid via Anymail. EMAIL_BACKEND itself is set per-environment
