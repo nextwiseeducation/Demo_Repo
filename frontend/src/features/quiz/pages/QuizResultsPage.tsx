@@ -105,7 +105,7 @@ export function QuizResultsPage() {
                       );
                     })}
                   </ul>
-                  <RationalePanel question={question} wasCorrect={response.is_correct} />
+                  <RationalePanel question={question} />
                   <div className="flex w-full justify-end">
                     <ReportIssueDialog questionStem={question.stem} questionNumber={index + 1} />
                   </div>

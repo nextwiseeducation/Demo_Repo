@@ -85,7 +85,7 @@ function QuizSessionInner({ questions }: { questions: Question[] }) {
       )}
 
       {isSupported && submitted && (
-        <RationalePanel question={question} wasCorrect={isAnswerCorrect(question, selectedIds)} />
+        <RationalePanel question={question} />
       )}
 
       {isSupported && (
