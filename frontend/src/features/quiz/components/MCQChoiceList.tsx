@@ -34,14 +34,14 @@ export function MCQChoiceList({
                 submitted && isSelected && !choice.is_correct && "border-destructive bg-destructive/10",
               )}
             >
-              <div className="flex items-center gap-3">
+              <div className="flex w-full items-center gap-3">
                 <RadioGroupItem id={choice.id} value={choice.id} disabled={submitted} />
                 <span className="flex-1 text-foreground">{choice.choice_text}</span>
                 {submitted && choice.is_correct && <Check className="h-4 w-4 shrink-0 text-success" />}
                 {submitted && isSelected && !choice.is_correct && <X className="h-4 w-4 shrink-0 text-destructive" />}
               </div>
               {submitted && choice.rationale && (
-                <p className="pl-7 text-sm leading-relaxed text-muted-foreground">{choice.rationale}</p>
+                <p className="w-full pl-7 text-sm leading-relaxed text-muted-foreground">{choice.rationale}</p>
               )}
             </Label>
           );
