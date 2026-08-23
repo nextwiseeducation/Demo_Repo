@@ -10,7 +10,7 @@ services:
     runtime: python
     plan: free
     rootDir: backend
-    buildCommand: "pip install -r requirements.txt && python manage.py collectstatic --noinput && python manage.py migrate --noinput"
+    buildCommand: "pip install -r requirements.txt && python manage.py collectstatic --noinput && python manage.py migrate --noinput && python manage.py ensure_superuser"
     startCommand: "gunicorn config.wsgi --log-file -"
     envVars:
       - key: DJANGO_SETTINGS_MODULE
@@ -32,6 +32,15 @@ services:
       - key: DEFAULT_FROM_EMAIL
         sync: false
       - key: STRIPE_WEBHOOK_SECRET
+        sync: false
+      # Bootstraps the one initial /admin/ login (see
+      # apps/accounts/management/commands/ensure_superuser.py) — Render's
+      # free web-service plan has no Shell/SSH access, so `createsuperuser`
+      # can't be run interactively after deploy. Safe to leave set
+      # permanently: the command no-ops on every deploy after the first.
+      - key: DJANGO_SUPERUSER_EMAIL
+        sync: false
+      - key: DJANGO_SUPERUSER_PASSWORD
         sync: false
       # Points at the frontend static site below — used to build links in
       # emails (verification, password reset) and as the one origin
