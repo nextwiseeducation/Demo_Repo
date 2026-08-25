@@ -9,6 +9,7 @@ import { RegisterPage } from "@/features/auth/pages/RegisterPage";
 import { ResetPasswordPage } from "@/features/auth/pages/ResetPasswordPage";
 import { VerifyEmailPage } from "@/features/auth/pages/VerifyEmailPage";
 import { DashboardPage } from "@/features/dashboard/pages/DashboardPage";
+import { SettingsPage } from "@/features/settings/pages/SettingsPage";
 import { AccessibilityPage } from "@/features/marketing/pages/AccessibilityPage";
 import { FaqPage } from "@/features/marketing/pages/FaqPage";
 import { LandingPage } from "@/features/marketing/pages/LandingPage";
@@ -53,6 +54,7 @@ export const router = createBrowserRouter([
         element: <AppShell />,
         children: [
           { path: "/dashboard", element: <DashboardPage /> },
+          { path: "/settings", element: <SettingsPage /> },
           { path: "/quiz", element: <QuizSetupPage /> },
           { path: "/quiz/session", element: <QuizSessionPage /> },
           { path: "/quiz/results", element: <QuizResultsPage /> },

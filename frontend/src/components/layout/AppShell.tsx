@@ -1,4 +1,4 @@
-import { LogOut, User } from "lucide-react";
+import { LogOut, Settings, User } from "lucide-react";
 import { Link, NavLink, Outlet, useNavigate } from "react-router-dom";
 
 import { Logo } from "@/components/common/Logo";
@@ -6,6 +6,7 @@ import { Badge } from "@/components/ui/badge";
 import {
   DropdownMenu,
   DropdownMenuContent,
+  DropdownMenuGroup,
   DropdownMenuItem,
   DropdownMenuLabel,
   DropdownMenuSeparator,
@@ -48,23 +49,25 @@ export function AppShell() {
               <User className="h-4 w-4" />
             </DropdownMenuTrigger>
             <DropdownMenuContent align="end" className="w-64">
-              <DropdownMenuLabel className="flex flex-col gap-1">
-                <span className="truncate text-sm font-medium text-foreground">{user?.full_name || user?.email}</span>
-                <span className="truncate text-xs font-normal text-muted-foreground">{user?.email}</span>
-              </DropdownMenuLabel>
-              <div className="px-2 pb-1.5">
-                <Badge variant="secondary">{SUBSCRIPTION_LABELS[user?.subscription_status ?? "FREE"]}</Badge>
-              </div>
-              <DropdownMenuSeparator />
-              <DropdownMenuItem disabled className="justify-between">
-                Manage subscription
-                <span className="text-xs text-muted-foreground">Coming soon</span>
-              </DropdownMenuItem>
-              <DropdownMenuSeparator />
-              <DropdownMenuItem onClick={handleLogout} variant="destructive">
-                <LogOut className="h-4 w-4" />
-                Log out
-              </DropdownMenuItem>
+              <DropdownMenuGroup>
+                <DropdownMenuLabel className="flex flex-col gap-1">
+                  <span className="truncate text-sm font-medium text-foreground">{user?.full_name || user?.email}</span>
+                  <span className="truncate text-xs font-normal text-muted-foreground">{user?.email}</span>
+                </DropdownMenuLabel>
+                <div className="px-2 pb-1.5">
+                  <Badge variant="secondary">{SUBSCRIPTION_LABELS[user?.subscription_status ?? "FREE"]}</Badge>
+                </div>
+                <DropdownMenuSeparator />
+                <DropdownMenuItem render={<Link to={ROUTES.settings} />}>
+                  <Settings className="h-4 w-4" />
+                  Settings
+                </DropdownMenuItem>
+                <DropdownMenuSeparator />
+                <DropdownMenuItem onClick={handleLogout} variant="destructive">
+                  <LogOut className="h-4 w-4" />
+                  Log out
+                </DropdownMenuItem>
+              </DropdownMenuGroup>
             </DropdownMenuContent>
           </DropdownMenu>
         </div>
