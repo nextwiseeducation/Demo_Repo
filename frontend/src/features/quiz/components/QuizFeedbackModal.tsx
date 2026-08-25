@@ -129,7 +129,7 @@ export function QuizFeedbackModal({ open, onOpenChange, questionCount }: QuizFee
       <DialogContent className="max-h-[85vh] overflow-y-auto sm:max-w-lg" showCloseButton={false}>
         <DialogHeader>
           <DialogTitle>After-Quiz Feedback</DialogTitle>
-          <DialogDescription>Help us improve NextWise — this takes about a minute.</DialogDescription>
+          <DialogDescription>Help us improve NextWise. This takes about a minute.</DialogDescription>
         </DialogHeader>
 
         <div className="flex flex-col gap-5 py-2">

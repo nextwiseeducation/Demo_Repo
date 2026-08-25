@@ -31,7 +31,7 @@ export function AuthLayout() {
             Stronger Clinical Judgment.
           </p>
           <p className="mt-4 max-w-sm text-[15px] leading-relaxed text-[color:var(--brand-indigo-light)]">
-            NGN-ready practice questions, built around NCSBN's Clinical Judgment Model — with a rationale behind
+            NGN-ready practice questions, built around NCSBN's Clinical Judgment Model, with a rationale behind
             every answer.
           </p>
         </div>

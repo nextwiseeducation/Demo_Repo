@@ -55,7 +55,7 @@ export function LoginPage() {
       }
     >
       <form onSubmit={handleSubmit((values) => mutation.mutate(values))} className="flex flex-col gap-4">
-        {error?.isRateLimited && <RateLimitBanner message="Too many login attempts — try again in a minute." />}
+        {error?.isRateLimited && <RateLimitBanner message="Too many login attempts. Try again in a minute." />}
         {error && !error.isRateLimited && (
           <p className="rounded-lg border border-destructive/30 bg-destructive/10 px-3 py-2 text-sm text-destructive">
             We couldn't log you in. Double-check your email and password, or if you just registered, make sure

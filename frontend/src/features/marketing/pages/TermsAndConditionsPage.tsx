@@ -65,7 +65,7 @@ export function TermsAndConditionsPage() {
           NextWise is currently in an early-access phase. Some or all features may be provided free of charge during
           this period, without commitment that they will remain free indefinitely. We plan to introduce paid
           subscription plans in the future. Before any paid plan becomes active, we will publish the applicable
-          pricing, billing terms, and refund policy, and those terms will apply going forward from that point — they
+          pricing, billing terms, and refund policy, and those terms will apply going forward from that point. They
           are not part of these Terms today.
         </p>
       </LegalSection>

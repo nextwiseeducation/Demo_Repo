@@ -33,13 +33,13 @@ export function PrivacyPolicyPage() {
         <ul>
           <li>
             <strong>Account information</strong> you provide directly: your name, email address, and password
-            (stored only as a one-way cryptographic hash — we never store or have access to your plain-text
+            (stored only as a one-way cryptographic hash; we never store or have access to your plain-text
             password).
           </li>
           <li>
             <strong>Study activity</strong>: which practice questions you answer, which answer choices you select,
             whether your answers were correct, how long you spend on each question, and the quiz sessions you
-            complete. We keep this detail — not just a pass/fail summary — so we can show you meaningful progress
+            complete. We keep this detail, not just a pass/fail summary, so we can show you meaningful progress
             and, in a future release, explain specifically why an answer was incorrect.
           </li>
           <li>
@@ -94,7 +94,7 @@ export function PrivacyPolicyPage() {
 
       <LegalSection id="cookies-and-local-storage" title="Cookies and Local Storage">
         <p>
-          NextWise uses browser storage that is necessary to keep you signed in — specifically, your session's
+          NextWise uses browser storage that is necessary to keep you signed in. Specifically, your session's
           refresh token is kept in your browser's local storage so you don't need to log in every time you visit.
           We do not currently use cookies for advertising or cross-site tracking.
         </p>

@@ -22,7 +22,7 @@ const CATEGORIES: FaqCategory[] = [
         id: "what-is-nextwise",
         question: "What is NextWise Education?",
         answer:
-          "NextWise is an online practice platform for students preparing for the NCLEX-RN and NCLEX-PN licensure exams — practice questions, detailed rationales, and performance tracking, organized around the same Client Needs categories and Clinical Judgment Measurement Model the actual exam uses.",
+          "NextWise is an online practice platform for students preparing for the NCLEX-RN and NCLEX-PN licensure exams, offering practice questions, detailed rationales, and performance tracking, organized around the same Client Needs categories and Clinical Judgment Measurement Model the actual exam uses.",
       },
       {
         id: "ncsbn-affiliation",
@@ -34,7 +34,7 @@ const CATEGORIES: FaqCategory[] = [
         id: "rn-vs-pn",
         question: "Do you support both NCLEX-RN and NCLEX-PN prep?",
         answer:
-          "Our content taxonomy is built to support both tracks. Availability of PN-specific content depends on what's been published to the question bank — check back as we continue to grow our content library.",
+          "Our content taxonomy is built to support both tracks. Availability of PN-specific content depends on what's been published to the question bank, so check back as we continue to grow our content library.",
       },
     ],
   },
@@ -47,7 +47,7 @@ const CATEGORIES: FaqCategory[] = [
         answer: (
           <>
             Select "Get started" from the homepage, enter your name, email, and a password, and submit the form.
-            We'll send a verification email to confirm your address — you'll need to click the link in that email
+            We'll send a verification email to confirm your address, and you'll need to click the link in that email
             before you can log in. See our{" "}
             <Link to={ROUTES.register} className="text-primary hover:underline">
               registration page
@@ -60,7 +60,7 @@ const CATEGORIES: FaqCategory[] = [
         id: "verification-email-missing",
         question: "I didn't receive my verification email. What should I do?",
         answer:
-          "Check your spam or junk folder first — verification emails sometimes land there. If it's genuinely missing after a few minutes, contact support using the details below and we'll help sort it out.",
+          "Check your spam or junk folder first, since verification emails sometimes land there. If it's genuinely missing after a few minutes, contact support using the details below and we'll help sort it out.",
       },
       {
         id: "forgot-password",
@@ -85,7 +85,7 @@ const CATEGORIES: FaqCategory[] = [
         id: "question-types-supported",
         question: "Which question types are available right now?",
         answer:
-          "Standard multiple-choice (MCQ) and Select All That Apply (SATA) questions are fully interactive today. Additional Next Generation NCLEX formats — Matrix/Grid, Bow-Tie, Extended Multiple Response, Drag and Drop, Drop-down Cloze, Enhanced Hot Spot, and full NGN Case Studies — are represented in our content schema and are being rolled out to the practice experience next.",
+          "Standard multiple-choice (MCQ) and Select All That Apply (SATA) questions are fully interactive today. Additional Next Generation NCLEX formats, including Matrix/Grid, Bow-Tie, Extended Multiple Response, Drag and Drop, Drop-down Cloze, Enhanced Hot Spot, and full NGN Case Studies, are represented in our content schema and are being rolled out to the practice experience next.",
       },
       {
         id: "rationales-included",
@@ -108,13 +108,13 @@ const CATEGORIES: FaqCategory[] = [
         id: "is-it-free",
         question: "Is NextWise free to use right now?",
         answer:
-          "NextWise is currently in an early-access phase. We'll clearly publish pricing and plan details before any paid subscription goes live — nothing will be billed to you without that information being available up front.",
+          "NextWise is currently in an early-access phase. We'll clearly publish pricing and plan details before any paid subscription goes live, and nothing will be billed to you without that information being available up front.",
       },
       {
         id: "future-trial",
         question: "Will there be a free trial once paid plans launch?",
         answer:
-          "Yes — the plan is to offer a limited free trial (a time window and/or a capped number of practice questions) so you can try the full question bank before subscribing. Exact details will be announced alongside pricing.",
+          "Yes. The plan is to offer a limited free trial (a time window and/or a capped number of practice questions) so you can try the full question bank before subscribing. Exact details will be announced alongside pricing.",
       },
     ],
   },

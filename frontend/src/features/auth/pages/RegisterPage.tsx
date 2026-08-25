@@ -68,7 +68,7 @@ export function RegisterPage() {
           </span>
           <p className="text-sm text-muted-foreground">
             We sent a verification link to <span className="font-medium text-foreground">{submittedEmail}</span>. It
-            can take a minute to arrive — check your spam folder too. The link expires in 3 days.
+            can take a minute to arrive, so check your spam folder too. The link expires in 3 days.
           </p>
           <Link to={ROUTES.login} className="text-sm font-medium text-primary hover:underline">
             Back to log in
@@ -94,7 +94,7 @@ export function RegisterPage() {
       }
     >
       <form onSubmit={handleSubmit((values) => mutation.mutate(values))} className="flex flex-col gap-4">
-        {rateLimited && <RateLimitBanner message="Too many registration attempts — try again in about an hour." />}
+        {rateLimited && <RateLimitBanner message="Too many registration attempts. Try again in about an hour." />}
 
         <div className="flex flex-col gap-1.5">
           <Label htmlFor="full_name">Full name</Label>

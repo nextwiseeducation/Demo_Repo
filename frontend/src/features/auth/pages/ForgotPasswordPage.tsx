@@ -43,7 +43,7 @@ export function ForgotPasswordPage() {
             <MailCheck className="h-5 w-5" />
           </span>
           <p className="text-sm text-muted-foreground">
-            If that email is registered, we've sent a reset link — it can take a minute to arrive.
+            If that email is registered, we've sent a reset link. It can take a minute to arrive.
           </p>
           <button
             onClick={() => {
@@ -70,7 +70,7 @@ export function ForgotPasswordPage() {
       }
     >
       <form onSubmit={handleSubmit((values) => mutation.mutate(values))} className="flex flex-col gap-4">
-        {error?.isRateLimited && <RateLimitBanner message="Too many reset attempts — try again in about an hour." />}
+        {error?.isRateLimited && <RateLimitBanner message="Too many reset attempts. Try again in about an hour." />}
 
         <div className="flex flex-col gap-1.5">
           <Label htmlFor="email">Email</Label>

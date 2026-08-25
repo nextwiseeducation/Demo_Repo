@@ -48,7 +48,7 @@ export function QuizSetupPage() {
       <div>
         <h1 className="font-display text-2xl font-semibold text-foreground">Start a practice quiz</h1>
         <p className="mt-1 text-sm text-muted-foreground">
-          Using a sample question set for this preview — not the full content-team bank.
+          Using a sample question set for this preview, not the full content-team bank.
         </p>
       </div>
 

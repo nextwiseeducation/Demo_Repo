@@ -86,7 +86,7 @@ export function ResetPasswordPage() {
           <span className="flex h-11 w-11 items-center justify-center rounded-full bg-success/10 text-success">
             <CheckCircle2 className="h-5 w-5" />
           </span>
-          <p className="text-sm text-muted-foreground">Your password has been reset — you can now log in.</p>
+          <p className="text-sm text-muted-foreground">Your password has been reset. You can now log in.</p>
           <Button render={<Link to={ROUTES.login}>Log in</Link>} className="w-full" />
         </div>
       </AuthCard>
@@ -97,7 +97,7 @@ export function ResetPasswordPage() {
     <AuthCard title="Set a new password">
       <form onSubmit={handleSubmit((values) => mutation.mutate(values))} className="flex flex-col gap-4">
         {normalizedError?.isRateLimited && (
-          <RateLimitBanner message="Too many attempts — try again in about an hour." />
+          <RateLimitBanner message="Too many attempts. Try again in about an hour." />
         )}
 
         <div className="flex flex-col gap-1.5">

@@ -44,7 +44,7 @@ export function QuizResultsPage() {
       <div className="rounded-xl border border-accent/30 bg-accent/10 px-4 py-3 text-sm text-foreground/90">
         <div className="flex items-start gap-2">
           <Info className="mt-0.5 h-4 w-4 shrink-0 text-accent" />
-          <p>This is a practice summary from sample questions — it isn't saved to your account.</p>
+          <p>This is a practice summary from sample questions. It isn't saved to your account.</p>
         </div>
       </div>
 

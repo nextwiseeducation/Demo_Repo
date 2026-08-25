@@ -74,8 +74,8 @@ const TESTIMONIALS = [
 
 const PERKS = [
   { icon: Clock, title: "Configurable timer", description: "Set your own pace, or simulate real exam conditions." },
-  { icon: RotateCcw, title: "Resume mid-quiz", description: "Session state is saved automatically — pick up right where you left off." },
-  { icon: FileCheck, title: "A rationale for every choice", description: "Not just the correct one — understand why each distractor is wrong." },
+  { icon: RotateCcw, title: "Resume mid-quiz", description: "Session state is saved automatically, so you can pick up right where you left off." },
+  { icon: FileCheck, title: "A rationale for every choice", description: "Not just the correct one. Understand why each distractor is wrong." },
 ];
 
 export function LandingPage() {
@@ -109,7 +109,7 @@ export function LandingPage() {
               Stronger Clinical Judgment.
             </h1>
             <p className="mt-5 max-w-md text-base leading-relaxed text-[color:var(--brand-indigo-light)]">
-              NGN-ready practice questions built around how the real exam actually thinks — with a rationale behind
+              NGN-ready practice questions built around how the real exam actually thinks, with a rationale behind
               every answer.
             </p>
             <div className="mt-8 flex flex-wrap gap-3">
@@ -156,7 +156,7 @@ export function LandingPage() {
         <div className="mx-auto max-w-2xl text-center">
           <h2 className="font-display text-3xl font-semibold text-foreground">Built on the real schema, not a demo</h2>
           <p className="mt-3 text-muted-foreground">
-            Everything below reflects how the platform is actually structured — not a marketing simplification.
+            Everything below reflects how the platform is actually structured, not a marketing simplification.
           </p>
         </div>
         <div className="mt-12 grid gap-6 sm:grid-cols-2">
@@ -200,7 +200,7 @@ export function LandingPage() {
         <div className="mx-auto max-w-2xl text-center">
           <h2 className="font-display text-3xl font-semibold text-foreground">What students are saying</h2>
           <p className="mt-3 text-sm text-muted-foreground">
-            Placeholder — real student testimonials will replace this once the beta cohort has practiced with NextWise.
+            Placeholder: real student testimonials will replace this once the beta cohort has practiced with NextWise.
           </p>
         </div>
         <div className="mt-12 grid gap-6 sm:grid-cols-3">
@@ -253,7 +253,7 @@ export function LandingPage() {
               Every question grounded in a real clinical picture
             </h2>
             <p className="mt-4 leading-relaxed text-muted-foreground">
-              No abstract trivia — every scenario mirrors the assessments, findings, and priority calls you'll
+              No abstract trivia. Every scenario mirrors the assessments, findings, and priority calls you'll
               actually make on the floor. Built to develop judgment, not just recall.
             </p>
           </div>
@@ -277,7 +277,7 @@ export function LandingPage() {
         <div className="grid items-center gap-10 lg:grid-cols-2">
           <div>
             <h2 className="font-display text-3xl font-semibold text-foreground">Ready to start practicing?</h2>
-            <p className="mt-3 text-foreground">Create a free account — no credit card required.</p>
+            <p className="mt-3 text-foreground">Create a free account, no credit card required.</p>
             <Button size="lg" className="mt-6" render={<Link to={ROUTES.register}>Get started</Link>} />
           </div>
           <img

@@ -11,7 +11,7 @@ export function UnsupportedQuestionTypeNotice({ questionType, onSkip }: { questi
       </span>
       <div>
         <h3 className="font-display text-base font-medium text-foreground">
-          {QUESTION_TYPE_LABELS[questionType]} — coming soon
+          {QUESTION_TYPE_LABELS[questionType]}: coming soon
         </h3>
         <p className="mt-1 max-w-sm text-sm text-muted-foreground">
           This question type is part of the full NGN schema but isn't interactive in this preview yet.

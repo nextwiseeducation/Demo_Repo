@@ -57,7 +57,7 @@ export function ReportIssueDialog({ questionStem, questionNumber }: ReportIssueD
         issue_type: issueType,
         description: description.trim() || undefined,
       });
-      toast.success("Thanks — we'll take a look.");
+      toast.success("Thanks, we'll take a look.");
       reset();
       setOpen(false);
     } catch {
@@ -91,7 +91,7 @@ export function ReportIssueDialog({ questionStem, questionNumber }: ReportIssueD
         <DialogHeader>
           <DialogTitle>Report an issue</DialogTitle>
           <DialogDescription>
-            {questionNumber ? `Question ${questionNumber} — ` : ""}
+            {questionNumber ? `Question ${questionNumber}: ` : ""}
             let us know what's wrong and we'll take a look.
           </DialogDescription>
         </DialogHeader>

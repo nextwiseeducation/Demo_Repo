@@ -64,7 +64,7 @@ export function AccessibilityPage() {
             accessibility@nextwiseeducation.com
           </a>
           . Please include the page you were on and, if possible, the assistive technology and browser you were
-          using — it helps us reproduce and fix the issue faster.
+          using, since it helps us reproduce and fix the issue faster.
         </p>
       </LegalSection>
     </LegalPageLayout>
