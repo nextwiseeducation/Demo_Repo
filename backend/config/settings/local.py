@@ -13,7 +13,7 @@ DEBUG = True
 # is always reached via localhost/127.0.0.1, so nothing else is needed here.
 ALLOWED_HOSTS = ["localhost", "127.0.0.1"]
 
-# No real SendGrid key needed for local dev — emails print to the console.
+# No real Resend key needed for local dev — emails print to the console.
 # This is what lets the registration/password-reset E2E flow be tested
 # end-to-end locally (verification links included) without any email
 # provider credentials — the runserver terminal output *is* the inbox.

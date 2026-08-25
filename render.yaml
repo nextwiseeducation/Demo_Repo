@@ -27,7 +27,7 @@ services:
       # and this value must be updated to match).
       - key: ALLOWED_HOSTS
         value: nextwise-backend.onrender.com
-      - key: SENDGRID_API_KEY
+      - key: RESEND_API_KEY
         sync: false
       - key: DEFAULT_FROM_EMAIL
         sync: false

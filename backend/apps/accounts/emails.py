@@ -1,11 +1,15 @@
+import logging
+
 from django.conf import settings
 # Django's built-in mail-sending function — which backend actually delivers
-# the message (console print in dev, SendGrid via Anymail in production) is
+# the message (console print in dev, Resend via Anymail in production) is
 # decided entirely by EMAIL_BACKEND in settings, so this file never needs to
 # know or care which environment it's running in.
 from django.core.mail import send_mail
 
 from .tokens import make_verification_token
+
+logger = logging.getLogger(__name__)
 
 
 def send_verification_email(user):
@@ -17,12 +21,21 @@ def send_verification_email(user):
     # GET /api/auth/verify-email/<token>/ itself. FRONTEND_URL is
     # environment-specific (localhost:5173 in dev, the real domain in prod).
     verify_url = f"{settings.FRONTEND_URL}/verify-email?token={token}"
-    send_mail(
-        subject="Verify your NextWise Education account",
-        message=f"Welcome to NextWise Education. Verify your email to activate your account:\n\n{verify_url}",
-        from_email=settings.DEFAULT_FROM_EMAIL,
-        recipient_list=[user.email],
-    )
+    # Caller (RegisterView) must still return 201 even if the send itself
+    # fails (e.g. Resend misconfigured/down) — the account already exists
+    # at this point, and surfacing a 500 here would strand it: the student
+    # can't register again (email taken) and got no usable error to act on.
+    # Swallow-and-log means the failure shows up in logs/monitoring instead
+    # of as a broken signup for the student.
+    try:
+        send_mail(
+            subject="Verify your NextWise Education account",
+            message=f"Welcome to NextWise Education. Verify your email to activate your account:\n\n{verify_url}",
+            from_email=settings.DEFAULT_FROM_EMAIL,
+            recipient_list=[user.email],
+        )
+    except Exception:
+        logger.exception("Failed to send verification email to %s", user.email)
 
 
 def send_password_reset_email(user, uid, token):
@@ -32,9 +45,16 @@ def send_password_reset_email(user, uid, token):
     # a pure "format and send" step with no knowledge of how the token was
     # produced.
     reset_url = f"{settings.FRONTEND_URL}/reset-password?uid={uid}&token={token}"
-    send_mail(
-        subject="Reset your NextWise Education password",
-        message=f"Reset your password using the link below:\n\n{reset_url}",
-        from_email=settings.DEFAULT_FROM_EMAIL,
-        recipient_list=[user.email],
-    )
+    # Same reasoning as send_verification_email above: the caller always
+    # responds with the same generic "if that email is registered..." 200
+    # regardless of what happens here, so a raised exception would turn into
+    # an unhandled 500 instead of that intended generic response.
+    try:
+        send_mail(
+            subject="Reset your NextWise Education password",
+            message=f"Reset your password using the link below:\n\n{reset_url}",
+            from_email=settings.DEFAULT_FROM_EMAIL,
+            recipient_list=[user.email],
+        )
+    except Exception:
+        logger.exception("Failed to send password reset email to %s", user.email)

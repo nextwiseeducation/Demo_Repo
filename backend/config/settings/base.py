@@ -59,7 +59,7 @@ INSTALLED_APPS = [
     "corsheaders",  # lets the browser-hosted React frontend (a different Render origin in staging/prod) call this API at all — without it, the browser blocks every cross-origin fetch before it reaches Django. Not needed in local dev, where Vite's proxy (vite.config.ts) makes requests same-origin instead.
     "rest_framework",  # Django REST Framework — turns Django into a JSON API (serializers, viewsets, browsable API)
     "rest_framework_simplejwt.token_blacklist",  # stores blacklisted refresh tokens in the DB; required because SIMPLE_JWT below has BLACKLIST_AFTER_ROTATION=True (logout/rotation needs somewhere to record "this token is now dead")
-    "anymail",  # provider-agnostic transactional email backend; lets EMAIL_BACKEND point at SendGrid in prod without SendGrid-specific code elsewhere (see the Email section below)
+    "anymail",  # provider-agnostic transactional email backend; lets EMAIL_BACKEND point at Resend in prod without Resend-specific code elsewhere (see the Email section below)
     # --- Local apps (see apps/<name>/models.py for what each owns) ---
     "apps.core",  # no models of its own yet; home for cross-app abstractions like the UUID-PK/timestamp mixins other apps' models inherit from
     "apps.accounts",  # custom User model, registration/auth/JWT views
@@ -236,12 +236,12 @@ SIMPLE_JWT = {
 CORS_ALLOWED_ORIGINS = env.list("CORS_ALLOWED_ORIGINS", default=[FRONTEND_URL])
 
 
-# Email — SendGrid via Anymail. EMAIL_BACKEND itself is set per-environment
-# (console in local.py, Anymail's SendGrid backend in production.py) so
+# Email — Resend via Anymail. EMAIL_BACKEND itself is set per-environment
+# (console in local.py, Anymail's Resend backend in production.py) so
 # local dev never needs a real API key.
 DEFAULT_FROM_EMAIL = env("DEFAULT_FROM_EMAIL", default="no-reply@nextwiseeducation.com")
 ANYMAIL = {
-    "SENDGRID_API_KEY": env("SENDGRID_API_KEY", default=""),
+    "RESEND_API_KEY": env("RESEND_API_KEY", default=""),
 }
 
 # Stripe (Phase 2 — stubbed webhook endpoint only, no active integration yet)

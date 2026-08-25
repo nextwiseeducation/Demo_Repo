@@ -6,11 +6,11 @@ from .base import env
 
 DEBUG = False  # never show tracebacks/debug pages on a public deployment — leaks source code, settings, and stack traces to visitors
 
-# Anymail's SendGrid backend — same `send_mail()` call sites as the console
-# backend in local.py, but this one actually delivers via the SendGrid API
-# using ANYMAIL["SENDGRID_API_KEY"] (set in base.py from the env var Render
+# Anymail's Resend backend — same `send_mail()` call sites as the console
+# backend in local.py, but this one actually delivers via the Resend API
+# using ANYMAIL["RESEND_API_KEY"] (set in base.py from the env var Render
 # injects).
-EMAIL_BACKEND = "anymail.backends.sendgrid.EmailBackend"
+EMAIL_BACKEND = "anymail.backends.resend.EmailBackend"
 
 # --- HTTPS/transport security hardening ---
 # Render terminates TLS at its own edge/proxy and forwards plain HTTP to

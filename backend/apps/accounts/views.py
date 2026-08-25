@@ -59,7 +59,7 @@ class RegisterView(APIView):
         # is_active=False).
         user = serializer.save()
         # Fires immediately, synchronously, in the request/response cycle —
-        # fine for now since SendGrid/console-backend calls are fast, but
+        # fine for now since Resend/console-backend calls are fast, but
         # would be a candidate to move to an async task queue if email
         # sending ever became a bottleneck or unreliable dependency.
         send_verification_email(user)
