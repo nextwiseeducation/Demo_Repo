@@ -171,7 +171,8 @@
 
 
   /* ngn pathway */
-  .nw-land .path{display:grid;grid-template-columns:repeat(6,1fr);gap:12px;margin-top:34px}
+  .nw-land .ngn-split{margin-top:44px;display:grid;grid-template-columns:1fr 1fr;gap:20px;align-items:start}
+.nw-land .path{display:grid;grid-template-columns:repeat(6,1fr);gap:12px;margin-top:34px}
 .nw-land .pnode{position:relative;border-radius:16px;padding:18px 16px;background:rgba(255,255,255,.07);border:1px solid rgba(255,255,255,.16);backdrop-filter:blur(4px)}
 .nw-land .pnode b{display:flex;align-items:center;justify-content:center;width:28px;height:28px;border-radius:999px;background:rgba(255,255,255,.15);border:1px solid rgba(255,255,255,.3);font-family:'Space Grotesk';font-size:12.5px}
 .nw-land .pnode h4{margin-top:14px;font-size:15px;font-weight:600;line-height:1.3}
@@ -313,6 +314,7 @@
 .nw-land .final-in h2{font-size:30px}
 .nw-land .flow,
 .nw-land .path,
+.nw-land .ngn-split,
 .nw-land .cov{grid-template-columns:1fr}
 .nw-land .st3{grid-template-columns:1fr}
 .nw-land .dash-grid{padding:16px}

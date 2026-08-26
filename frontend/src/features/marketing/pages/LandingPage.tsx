@@ -290,7 +290,7 @@ export function LandingPage() {
             <div className="pnode"><b>06</b><h4>Evaluate outcomes</h4><p>Did the action produce the expected result?</p></div>
         </div>
         <div className="pathline"><svg viewBox="0 0 24 24" width="16" height="16" fill="none" stroke="currentColor" strokeWidth="2.2" strokeLinecap="round" strokeLinejoin="round"><path d="M5 12h14M13 6l6 6-6 6"/></svg> <span>Highlighted steps are the ones the heart failure item above measures. Each question maps to its own subset.</span></div>
-        <div style={{marginTop: '44px', display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '20px', alignItems: 'start'}}>
+        <div className="ngn-split">
           <div className="pnode" style={{padding: '24px'}}>
             <h4 style={{fontSize: '18px'}}>From scenario to judgment</h4>
             <p style={{marginTop: '10px', fontSize: '14px', lineHeight: '1.7'}}>A clinical picture arrives with more information than you need. The work is deciding which findings matter, what they mean together, and which action comes first. Every NextWise item is written to make you do that work rather than recognise a keyword.</p>
