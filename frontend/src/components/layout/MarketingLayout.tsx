@@ -1,3 +1,5 @@
+import { Menu, X } from "lucide-react";
+import { useState } from "react";
 import { Link, Outlet } from "react-router-dom";
 
 import logoFull from "@/assets/marketing/logo-full.png";
@@ -5,20 +7,30 @@ import logoMark from "@/assets/marketing/logo-mark.png";
 import "@/features/marketing/pages/LandingPage.css";
 import { ROUTES } from "@/lib/constants";
 
+const NAV_LINKS = [
+  { href: "/#demo", label: "Practice" },
+  { href: "/#ngn", label: "NGN" },
+  { href: "/#features", label: "Features" },
+  { href: "/#pricing", label: "Pricing" },
+  { href: "/#faq", label: "FAQ" },
+];
+
 export function MarketingLayout() {
+  const [menuOpen, setMenuOpen] = useState(false);
+
   return (
     <div className="nw-land flex min-h-screen flex-col">
       <header>
         <div className="wrap hdr">
-          <Link to={ROUTES.home} aria-label="NextWise home">
+          <Link to={ROUTES.home} aria-label="NextWise home" onClick={() => setMenuOpen(false)}>
             <img src={logoFull} alt="NextWise" />
           </Link>
           <nav>
-            <a href="/#demo">Practice</a>
-            <a href="/#ngn">NGN</a>
-            <a href="/#features">Features</a>
-            <a href="/#pricing">Pricing</a>
-            <a href="/#faq">FAQ</a>
+            {NAV_LINKS.map((link) => (
+              <a key={link.href} href={link.href}>
+                {link.label}
+              </a>
+            ))}
           </nav>
           <div className="hdr-act">
             <Link className="btn btn-ghost" to={ROUTES.login}>
@@ -28,7 +40,36 @@ export function MarketingLayout() {
               Start Practicing Free
             </Link>
           </div>
+          <button
+            type="button"
+            className="hdr-toggle"
+            aria-label={menuOpen ? "Close menu" : "Open menu"}
+            aria-expanded={menuOpen}
+            onClick={() => setMenuOpen((open) => !open)}
+          >
+            {menuOpen ? <X className="h-5 w-5" /> : <Menu className="h-5 w-5" />}
+          </button>
         </div>
+
+        {menuOpen && (
+          <div className="mobile-nav">
+            <nav>
+              {NAV_LINKS.map((link) => (
+                <a key={link.href} href={link.href} onClick={() => setMenuOpen(false)}>
+                  {link.label}
+                </a>
+              ))}
+            </nav>
+            <div className="mobile-nav-act">
+              <Link className="btn btn-quiet btn-lg" to={ROUTES.login} onClick={() => setMenuOpen(false)}>
+                Log In
+              </Link>
+              <Link className="btn btn-cta btn-lg" to={ROUTES.register} onClick={() => setMenuOpen(false)}>
+                Start Practicing Free
+              </Link>
+            </div>
+          </div>
+        )}
       </header>
 
       <main className="flex-1">
