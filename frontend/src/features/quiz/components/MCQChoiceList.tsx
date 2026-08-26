@@ -17,32 +17,34 @@ export function MCQChoiceList({
   onSelect: (choiceId: string) => void;
 }) {
   return (
-    <RadioGroup value={selectedId ?? ""} onValueChange={(value) => onSelect(String(value))}>
+    <RadioGroup value={selectedId ?? ""} onValueChange={(value) => onSelect(String(value))} className="choices">
       {[...choices]
         .sort((a, b) => a.display_order - b.display_order)
         .map((choice) => {
           const isSelected = choice.id === selectedId;
+          const isCorrect = submitted && choice.is_correct;
+          const isWrongPick = submitted && isSelected && !choice.is_correct;
           return (
             <Label
               key={choice.id}
               htmlFor={choice.id}
-              className={cn(
-                "group/field-label flex cursor-pointer flex-col gap-2 rounded-lg border border-border bg-card px-4 py-3 text-sm font-normal transition-colors",
-                !submitted && isSelected && "border-primary bg-secondary/50",
-                !submitted && "hover:border-primary/50",
-                submitted && choice.is_correct && "border-success bg-success/10",
-                submitted && isSelected && !choice.is_correct && "border-destructive bg-destructive/10",
-              )}
+              className={cn("choice stacked", !submitted && isSelected && "selected", isCorrect && "correct", isWrongPick && "incorrect")}
             >
-              <div className="flex w-full items-center gap-3">
+              <div className="choice-row">
                 <RadioGroupItem id={choice.id} value={choice.id} disabled={submitted} />
-                <span className="flex-1 text-foreground">{choice.choice_text}</span>
-                {submitted && choice.is_correct && <Check className="h-4 w-4 shrink-0 text-success" />}
-                {submitted && isSelected && !choice.is_correct && <X className="h-4 w-4 shrink-0 text-destructive" />}
+                <span style={{ flex: 1 }}>{choice.choice_text}</span>
+                {isCorrect && (
+                  <span className="mk ok">
+                    <Check className="h-3 w-3" />
+                  </span>
+                )}
+                {isWrongPick && (
+                  <span className="mk no">
+                    <X className="h-3 w-3" />
+                  </span>
+                )}
               </div>
-              {submitted && choice.rationale && (
-                <p className="w-full pl-7 text-sm leading-relaxed text-muted-foreground">{choice.rationale}</p>
-              )}
+              {submitted && choice.rationale && <p className="choice-rationale">{choice.rationale}</p>}
             </Label>
           );
         })}

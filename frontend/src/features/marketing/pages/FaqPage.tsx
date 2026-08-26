@@ -22,7 +22,7 @@ const CATEGORIES: FaqCategory[] = [
         id: "what-is-nextwise",
         question: "What is NextWise Education?",
         answer:
-          "NextWise is an online practice platform for students preparing for the NCLEX-RN and NCLEX-PN licensure exams, offering practice questions, detailed rationales, and performance tracking, organized around the same Client Needs categories and Clinical Judgment Measurement Model the actual exam uses.",
+          "NextWise is an online practice platform for students preparing for the NCLEX-RN licensure exam, offering practice questions, detailed rationales, and performance tracking, organized around the same Client Needs categories and Clinical Judgment Measurement Model the actual exam uses.",
       },
       {
         id: "ncsbn-affiliation",
@@ -34,7 +34,7 @@ const CATEGORIES: FaqCategory[] = [
         id: "rn-vs-pn",
         question: "Do you support both NCLEX-RN and NCLEX-PN prep?",
         answer:
-          "Our content taxonomy is built to support both tracks. Availability of PN-specific content depends on what's been published to the question bank, so check back as we continue to grow our content library.",
+          "Currently, the platform only supports NCLEX-RN. However, we are considering adding NCLEX-PN prep in the future.",
       },
     ],
   },

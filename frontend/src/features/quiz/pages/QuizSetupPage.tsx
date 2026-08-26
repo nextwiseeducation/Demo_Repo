@@ -1,9 +1,6 @@
 import { useState } from "react";
 import { useNavigate } from "react-router-dom";
 
-import { Badge } from "@/components/ui/badge";
-import { Button } from "@/components/ui/button";
-import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 import { MOCK_QUESTIONS } from "@/features/quiz/data/mockQuestions";
 import { ROUTES } from "@/lib/constants";
@@ -14,6 +11,13 @@ import type { QuizFilterConfig } from "@/types/quiz";
 const NURSING_SYSTEMS = ["Cardiovascular", "Respiratory", "Endocrine", "Pharmacology", "Renal"];
 const QUESTION_COUNTS = [5, 10, 20];
 const ALL_TYPES = Object.keys(QUESTION_TYPE_LABELS) as QuestionType[];
+
+function joinLabels(labels: string[]): string {
+  if (labels.length === 0) return "";
+  if (labels.length === 1) return labels[0];
+  if (labels.length === 2) return `${labels[0]} and ${labels[1]}`;
+  return `${labels.slice(0, -1).join(", ")}, and ${labels[labels.length - 1]}`;
+}
 
 export function QuizSetupPage() {
   const navigate = useNavigate();
@@ -43,29 +47,33 @@ export function QuizSetupPage() {
     navigate(ROUTES.quizSession, { state: { questions: pool.slice(0, questionCount), filterConfig } });
   }
 
+  const selectedTypeLabels = questionTypes.map((t) => QUESTION_TYPE_LABELS[t]);
+  const summaryText =
+    questionTypes.length === 0
+      ? "Select at least one question type to continue"
+      : `${questionCount} ${difficulty ? `${DIFFICULTY_LABELS[difficulty].toLowerCase()} ` : ""}question${questionCount === 1 ? "" : "s"} · ${joinLabels(selectedTypeLabels)}`;
+
   return (
-    <div className="mx-auto flex max-w-2xl flex-col gap-6">
+    <div className="page">
       <div>
-        <h1 className="font-display text-2xl font-semibold text-foreground">Start a practice quiz</h1>
-        <p className="mt-1 text-sm text-muted-foreground">
-          Using a sample question set for this preview, not the full content-team bank.
-        </p>
+        <h1 className="page-title">Start a practice quiz</h1>
+        <p className="page-sub">Using a sample question set for this preview, not the full content-team bank.</p>
       </div>
 
-      <Card>
-        <CardHeader>
-          <CardTitle className="text-base">Filters</CardTitle>
-        </CardHeader>
-        <CardContent className="flex flex-col gap-5">
-          <div className="grid gap-4 sm:grid-cols-2">
-            <div className="flex flex-col gap-1.5">
-              <label className="text-sm font-medium text-foreground">Nursing system</label>
+      <div className="card">
+        <div className="card-header">
+          <div className="card-title">Filters</div>
+        </div>
+        <div className="card-content">
+          <div className="field-grid">
+            <div className="field">
+              <label>Nursing system</label>
               <Select value={nursingSystem ?? "any"} onValueChange={(v) => setNursingSystem(v === "any" ? null : String(v))}>
-                <SelectTrigger className="w-full">
-                  <SelectValue placeholder="Any system" />
+                <SelectTrigger className="h-[38px] w-full rounded-[10px] border-[color:var(--border)] bg-[#fdfdff] text-[14px]">
+                  <SelectValue placeholder="All systems" />
                 </SelectTrigger>
                 <SelectContent>
-                  <SelectItem value="any">Any system</SelectItem>
+                  <SelectItem value="any">All systems</SelectItem>
                   {NURSING_SYSTEMS.map((system) => (
                     <SelectItem key={system} value={system}>
                       {system}
@@ -75,10 +83,10 @@ export function QuizSetupPage() {
               </Select>
             </div>
 
-            <div className="flex flex-col gap-1.5">
-              <label className="text-sm font-medium text-foreground">Question count</label>
+            <div className="field">
+              <label>Question count</label>
               <Select value={String(questionCount)} onValueChange={(v) => setQuestionCount(Number(v))}>
-                <SelectTrigger className="w-full">
+                <SelectTrigger className="h-[38px] w-full rounded-[10px] border-[color:var(--border)] bg-[#fdfdff] text-[14px]">
                   <SelectValue />
                 </SelectTrigger>
                 <SelectContent>
@@ -92,20 +100,15 @@ export function QuizSetupPage() {
             </div>
           </div>
 
-          <div className="flex flex-col gap-1.5">
-            <label className="text-sm font-medium text-foreground">Difficulty</label>
-            <div className="flex flex-wrap gap-2">
+          <div className="field">
+            <label>Difficulty</label>
+            <div className="pill-row">
               {(["EASY", "MEDIUM", "HARD"] as Difficulty[]).map((level) => (
                 <button
                   key={level}
                   type="button"
                   onClick={() => setDifficulty((prev) => (prev === level ? null : level))}
-                  className={cn(
-                    "rounded-full border px-3 py-1 text-sm font-medium transition-colors",
-                    difficulty === level
-                      ? "border-primary bg-primary text-primary-foreground"
-                      : "border-border text-muted-foreground hover:border-primary/50",
-                  )}
+                  className={cn("pill", difficulty === level && "selected")}
                 >
                   {DIFFICULTY_LABELS[level]}
                 </button>
@@ -113,9 +116,9 @@ export function QuizSetupPage() {
             </div>
           </div>
 
-          <div className="flex flex-col gap-1.5">
-            <label className="text-sm font-medium text-foreground">Question types</label>
-            <div className="grid grid-cols-2 gap-2 sm:grid-cols-3">
+          <div className="field">
+            <label>Question types</label>
+            <div className="type-grid">
               {ALL_TYPES.map((type) => {
                 const supported = SUPPORTED_QUESTION_TYPES.includes(type);
                 const selected = questionTypes.includes(type);
@@ -125,30 +128,26 @@ export function QuizSetupPage() {
                     type="button"
                     disabled={!supported}
                     onClick={() => toggleType(type)}
-                    className={cn(
-                      "flex items-center justify-between gap-2 rounded-lg border px-3 py-2 text-left text-xs font-medium transition-colors",
-                      !supported && "cursor-not-allowed border-border/60 text-muted-foreground/50",
-                      supported && selected && "border-primary bg-secondary/50 text-foreground",
-                      supported && !selected && "border-border text-muted-foreground hover:border-primary/50",
-                    )}
+                    className={cn("type-btn", supported && selected && "selected", !supported && "disabled")}
                   >
                     {QUESTION_TYPE_LABELS[type]}
-                    {!supported && (
-                      <Badge variant="outline" className="shrink-0 text-[10px]">
-                        Soon
-                      </Badge>
-                    )}
+                    {!supported && <span className="soon-badge">Soon</span>}
                   </button>
                 );
               })}
             </div>
           </div>
-        </CardContent>
-      </Card>
 
-      <Button size="lg" onClick={handleStart}>
-        Start practice quiz
-      </Button>
+          <div className="divider" />
+
+          <div className="summary">
+            <span className="summary-text">{summaryText}</span>
+            <button type="button" className="btn-primary" disabled={questionTypes.length === 0} onClick={handleStart}>
+              Start practice quiz
+            </button>
+          </div>
+        </div>
+      </div>
     </div>
   );
 }

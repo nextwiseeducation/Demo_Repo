@@ -1,26 +1,32 @@
 import { Link, Outlet } from "react-router-dom";
 
-import { Logo } from "@/components/common/Logo";
-import { Button } from "@/components/ui/button";
+import logoFull from "@/assets/marketing/logo-full.png";
+import logoMark from "@/assets/marketing/logo-mark.png";
+import "@/features/marketing/pages/LandingPage.css";
 import { ROUTES } from "@/lib/constants";
 
 export function MarketingLayout() {
   return (
-    <div className="flex min-h-screen flex-col bg-background">
-      <header className="sticky top-0 z-40 border-b border-border/70 bg-background/85 backdrop-blur">
-        <div className="mx-auto flex h-16 max-w-6xl items-center justify-between px-6">
-          <Logo />
-          <nav className="hidden items-center gap-8 text-sm font-medium text-muted-foreground md:flex">
-            <a href="#features" className="hover:text-foreground">
-              Features
-            </a>
-            <a href="#how-it-works" className="hover:text-foreground">
-              How it works
-            </a>
+    <div className="nw-land flex min-h-screen flex-col">
+      <header>
+        <div className="wrap hdr">
+          <Link to={ROUTES.home} aria-label="NextWise home">
+            <img src={logoFull} alt="NextWise" />
+          </Link>
+          <nav>
+            <a href="/#demo">Practice</a>
+            <a href="/#ngn">NGN</a>
+            <a href="/#features">Features</a>
+            <a href="/#pricing">Pricing</a>
+            <a href="/#faq">FAQ</a>
           </nav>
-          <div className="flex items-center gap-2">
-            <Button variant="ghost" render={<Link to={ROUTES.login}>Log in</Link>} />
-            <Button render={<Link to={ROUTES.register}>Get started</Link>} />
+          <div className="hdr-act">
+            <Link className="btn btn-ghost" to={ROUTES.login}>
+              Log In
+            </Link>
+            <Link className="btn btn-cta" to={ROUTES.register}>
+              Start Practicing Free
+            </Link>
           </div>
         </div>
       </header>
@@ -29,65 +35,38 @@ export function MarketingLayout() {
         <Outlet />
       </main>
 
-      <footer className="bg-primary py-12">
-        <div className="mx-auto flex max-w-6xl flex-col gap-10 px-6">
-          <div className="flex flex-col gap-8 sm:flex-row sm:justify-between">
-            <div className="flex flex-col gap-3">
-              <Logo dark />
-              <p className="max-w-xs text-sm text-[color:var(--brand-indigo-light)]">
-                Practice questions, rationales, and progress tracking for NCLEX-RN and NCLEX-PN exam preparation.
-              </p>
+      <footer>
+        <div className="wrap">
+          <div className="foot">
+            <div className="foot-brand">
+              <img src={logoMark} alt="" /> NextWise
             </div>
-
-            <div className="grid grid-cols-2 gap-8 sm:grid-cols-3">
-              <div className="flex flex-col gap-2.5">
-                <p className="text-xs font-semibold tracking-wide text-[color:var(--brand-indigo-light)] uppercase">
-                  Product
-                </p>
-                <a href="#features" className="text-sm text-white/80 hover:text-white">
-                  Features
-                </a>
-                <a href="#how-it-works" className="text-sm text-white/80 hover:text-white">
-                  How it works
-                </a>
+            <div className="foot-links foot-links-grouped">
+              <div className="foot-col">
+                <span className="foot-col-label">Product</span>
+                <a href="/#features">Features</a>
+                <a href="/#how">How it works</a>
               </div>
-
-              <div className="flex flex-col gap-2.5">
-                <p className="text-xs font-semibold tracking-wide text-[color:var(--brand-indigo-light)] uppercase">
-                  Support
-                </p>
-                <Link to={ROUTES.faq} className="text-sm text-white/80 hover:text-white">
-                  FAQ
-                </Link>
-                <a href="mailto:support@nextwiseeducation.com" className="text-sm text-white/80 hover:text-white">
-                  Contact us
-                </a>
+              <div className="foot-col">
+                <span className="foot-col-label">Support</span>
+                <Link to={ROUTES.faq}>FAQ</Link>
+                <a href="mailto:support@nextwiseeducation.com">Contact us</a>
               </div>
-
-              <div className="flex flex-col gap-2.5">
-                <p className="text-xs font-semibold tracking-wide text-[color:var(--brand-indigo-light)] uppercase">
-                  Legal
-                </p>
-                <Link to={ROUTES.privacyPolicy} className="text-sm text-white/80 hover:text-white">
-                  Privacy Policy
-                </Link>
-                <Link to={ROUTES.termsAndConditions} className="text-sm text-white/80 hover:text-white">
-                  Terms and Conditions
-                </Link>
-                <Link to={ROUTES.accessibility} className="text-sm text-white/80 hover:text-white">
-                  Accessibility
-                </Link>
+              <div className="foot-col">
+                <span className="foot-col-label">Legal</span>
+                <Link to={ROUTES.privacyPolicy}>Privacy Policy</Link>
+                <Link to={ROUTES.termsAndConditions}>Terms and Conditions</Link>
+                <Link to={ROUTES.accessibility}>Accessibility</Link>
               </div>
             </div>
+            <span>© {new Date().getFullYear()} NextWise Education. All rights reserved.</span>
           </div>
-
-          <div className="flex flex-col gap-2 border-t border-white/15 pt-6 text-xs text-[color:var(--brand-indigo-light)]">
-            <p>© {new Date().getFullYear()} NextWise Education. All rights reserved.</p>
-            <p>
-              NCLEX-RN® and NCLEX-PN® are registered trademarks of the National Council of State Boards of Nursing,
-              Inc. (NCSBN). NextWise Education is not affiliated with, endorsed by, or sponsored by NCSBN.
-            </p>
-          </div>
+          <p className="disclaim">
+            NCLEX-RN is a registered trademark of the National Council of State Boards of Nursing (NCSBN). NextWise
+            is an independent preparation platform and is not endorsed by, approved by, or affiliated with NCSBN.
+            Dashboard and performance figures shown on this page are demo data used to illustrate the interface.
+            Features described as in development or coming soon are not yet available.
+          </p>
         </div>
       </footer>
     </div>

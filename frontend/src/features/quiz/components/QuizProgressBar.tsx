@@ -1,14 +1,27 @@
-import { Progress } from "@/components/ui/progress";
+import { DIFFICULTY_LABELS, type Question } from "@/types/question";
 
-export function QuizProgressBar({ currentIndex, total }: { currentIndex: number; total: number }) {
+export function QuizProgressBar({
+  currentIndex,
+  total,
+  question,
+}: {
+  currentIndex: number;
+  total: number;
+  question: Question;
+}) {
   return (
-    <div className="flex flex-col gap-1.5">
-      <div className="flex items-center justify-between text-sm text-muted-foreground">
+    <div>
+      <div className="progress-row">
         <span>
           Question {currentIndex + 1} of {total}
         </span>
+        <span>
+          {question.nursing_system} · {DIFFICULTY_LABELS[question.difficulty]}
+        </span>
       </div>
-      <Progress value={((currentIndex + 1) / total) * 100} />
+      <div className="progress-track">
+        <div className="progress-fill" style={{ width: `${((currentIndex + 1) / total) * 100}%` }} />
+      </div>
     </div>
   );
 }

@@ -1,7 +1,6 @@
 import { useReducer } from "react";
 import { Navigate, useLocation, useNavigate } from "react-router-dom";
 
-import { Button } from "@/components/ui/button";
 import { MCQChoiceList } from "@/features/quiz/components/MCQChoiceList";
 import { QuestionCard } from "@/features/quiz/components/QuestionCard";
 import { QuizProgressBar } from "@/features/quiz/components/QuizProgressBar";
@@ -58,8 +57,8 @@ function QuizSessionInner({ questions }: { questions: Question[] }) {
   }
 
   return (
-    <div className="mx-auto flex max-w-2xl flex-col gap-6">
-      <QuizProgressBar currentIndex={session.currentIndex} total={session.questions.length} />
+    <div className="page">
+      <QuizProgressBar currentIndex={session.currentIndex} total={session.questions.length} question={question} />
 
       {isSupported ? (
         <QuestionCard question={question} questionNumber={session.currentIndex + 1}>
@@ -84,16 +83,23 @@ function QuizSessionInner({ questions }: { questions: Question[] }) {
       )}
 
       {isSupported && (
-        <div className="flex justify-end gap-2">
+        <div className="actions">
           {!submitted ? (
-            <Button
-              disabled={selectedIds.length === 0}
-              onClick={() => dispatch({ type: "SUBMIT", questionId: question.id })}
-            >
-              Submit answer
-            </Button>
+            <>
+              <span className="hint">A rationale for every option appears after you submit.</span>
+              <button
+                type="button"
+                className="btn-primary"
+                disabled={selectedIds.length === 0}
+                onClick={() => dispatch({ type: "SUBMIT", questionId: question.id })}
+              >
+                Submit answer
+              </button>
+            </>
           ) : (
-            <Button onClick={goNextOrFinish}>{isLastQuestion ? "See results" : "Next question"}</Button>
+            <button type="button" className="btn-primary" style={{ marginLeft: "auto" }} onClick={goNextOrFinish}>
+              {isLastQuestion ? "See results" : "Next question"}
+            </button>
           )}
         </div>
       )}
