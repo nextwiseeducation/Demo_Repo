@@ -15,7 +15,7 @@ export function LandingPage() {
         <div>
           <span className="chip chip-glass" style={{height: '28px', padding: '0 14px'}}>Built specifically for the NCLEX-RN</span>
           <h1>Practice the NCLEX-RN the way <span>the exam actually thinks.</span></h1>
-          <p className="sub">NextWise is clinical judgment practice for NCLEX-RN candidates — not memorization drills. Every question starts from a real clinical picture, every answer choice comes with a written rationale, and your performance decides what you practice next.</p>
+          <p className="sub">NextWise is clinical judgment practice for NCLEX-RN candidates, not memorization drills. Every question starts from a real clinical picture, every answer choice comes with a written rationale, and your performance decides what you practice next.</p>
           <div className="hero-cta">
             <Link className="btn btn-cta btn-lg" to={ROUTES.register}>Start Practicing Free</Link>
             <a className="btn btn-glass btn-lg" href="#demo">See a real question <svg viewBox="0 0 24 24" width="16" height="16" fill="none" stroke="currentColor" strokeWidth="2.2" strokeLinecap="round" strokeLinejoin="round"><path d="M5 12h14M13 6l6 6-6 6"/></svg></a>
@@ -73,7 +73,7 @@ export function LandingPage() {
           <div><span className="eyebrow">Product demo</span><div className="rule"></div></div>
           <div>
             <h2>See the whole learning loop, not a screenshot</h2>
-            <p className="lede">Question, answer, rationale, clinical judgment, performance — the five stages a single NextWise item moves you through. Step through them below.</p>
+            <p className="lede">Question, answer, rationale, clinical judgment, performance: the five stages a single NextWise item moves you through. Step through them below.</p>
             <p style={{marginTop: '12px', fontSize: '13px', lineHeight: '1.6', color: 'var(--muted)'}}>[Note: this heart failure MCQ demonstrates the interface. It is a candidate for replacement with an item that shows cues, prioritization, and distractor reasoning together more strongly.]</p>
           </div>
         </div>    <div className="tabs">
@@ -102,7 +102,7 @@ export function LandingPage() {
               </div></div>
               </div>
               <div className="side">
-                <div className="side-card"><h4>A clinical picture first</h4><p>Each item opens with the client, the timeline, and the findings — the cues you have to recognize before you can answer. The scenario is part of the question, not decoration.</p></div>
+                <div className="side-card"><h4>A clinical picture first</h4><p>Each item opens with the client, the timeline, and the findings: the cues you have to recognize before you can answer. The scenario is part of the question, not decoration.</p></div>
                 <div className="side-card"><h4>Tagged before you see it</h4><p>Nursing system, topic, NCLEX category, difficulty, and question type are attached to every item, which is what makes filtering and reporting exact.</p></div>
                 <div className="side-card"><h4>Your pace or exam pace</h4><p>The timer is configurable per session. Sessions save automatically, so you can stop mid-quiz and resume.</p></div>
               </div>
@@ -126,7 +126,7 @@ export function LandingPage() {
               </div></div>
               </div>
               <div className="side">
-                <div className="side-card"><h4>Every option is marked, not just yours</h4><p>You see which choice was correct and which were not, in one view — so a lucky guess and a reasoned answer do not look the same.</p></div>
+                <div className="side-card"><h4>Every option is marked, not just yours</h4><p>You see which choice was correct and which were not, in one view, so a lucky guess and a reasoned answer do not look the same.</p></div>
                 <div className="callout"><svg viewBox="0 0 24 24" width="18" height="18" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><path d="M4 19.5A2.5 2.5 0 0 1 6.5 17H20"/><path d="M6.5 2H20v20H6.5A2.5 2.5 0 0 1 4 19.5v-15A2.5 2.5 0 0 1 6.5 2Z"/><path d="m9 10 2 2 4-4"/></svg><div><h4>The rationale opens next</h4><p>Feedback and reasoning arrive together, immediately after you submit.</p></div></div>
               </div>
             </div>
@@ -168,7 +168,7 @@ export function LandingPage() {
                 </div>
               </div>
               <div className="side">
-                <div className="side-card"><h4>Where students actually lose points</h4><p>Rarely because an option is absurd — usually because a reasonable action is not the priority action. Naming that distinction, option by option, is what the rationale is for.</p></div>
+                <div className="side-card"><h4>Where students actually lose points</h4><p>Rarely because an option is absurd; usually because a reasonable action is not the priority action. Naming that distinction, option by option, is what the rationale is for.</p></div>
                 <div className="side-card"><h4>Plain clinical language</h4><p>Written by nursing educators, in the language you would use on the floor rather than textbook phrasing.</p></div>
               </div>
             </div>
@@ -191,7 +191,7 @@ export function LandingPage() {
                 </div>
               </div>
               <div className="side">
-                <div className="side-card"><h4>Reported by step, not just by topic</h4><p>Because every item is mapped to a step of the clinical judgment model, your results can tell you whether you are missing cues or misprioritizing — two very different problems.</p></div>
+                <div className="side-card"><h4>Reported by step, not just by topic</h4><p>Because every item is mapped to a step of the clinical judgment model, your results can tell you whether you are missing cues or misprioritizing: two very different problems.</p></div>
                 <div className="side-card"><h4>Not affiliated with NCSBN</h4><p>NextWise references the publicly published Clinical Judgment Measurement Model. It is not endorsed by, approved by, or affiliated with NCSBN.</p></div>
               </div>
             </div>
@@ -214,7 +214,7 @@ export function LandingPage() {
                 </div>
               </div>
               <div className="side">
-                <div className="side-card"><h4>One question, four records</h4><p>Every answer updates your category accuracy, subcategory accuracy, difficulty profile, and clinical judgment step — which is what makes the recommendation specific.</p></div>
+                <div className="side-card"><h4>One question, four records</h4><p>Every answer updates your category accuracy, subcategory accuracy, difficulty profile, and clinical judgment step, which is what makes the recommendation specific.</p></div>
                 <div className="side-card"><h4>Nothing to configure</h4><p>You do not have to audit your own results to notice a pattern. The dashboard names it and turns it into a quiz.</p></div>
               </div>
             </div>
@@ -252,7 +252,7 @@ export function LandingPage() {
             <div className="fnode"><i></i></div>
             <h4>Understand why</h4>
             <p>Review detailed rationales for the correct answer and the distractors.</p>
-            <div className="fvis"><div style={{display: 'flex', gap: '8px', alignItems: 'flex-start'}}><span className="mk ok"><svg viewBox="0 0 24 24" width="16" height="16" fill="none" stroke="currentColor" strokeWidth="2.6" strokeLinecap="round" strokeLinejoin="round"><path d="M20 6 9 17l-5-5"/></svg></span><span style={{fontSize: '11.5px', lineHeight: '1.5', color: 'var(--muted)'}}>Correct — recognizing the cue and escalating is the priority.</span></div></div>
+            <div className="fvis"><div style={{display: 'flex', gap: '8px', alignItems: 'flex-start'}}><span className="mk ok"><svg viewBox="0 0 24 24" width="16" height="16" fill="none" stroke="currentColor" strokeWidth="2.6" strokeLinecap="round" strokeLinejoin="round"><path d="M20 6 9 17l-5-5"/></svg></span><span style={{fontSize: '11.5px', lineHeight: '1.5', color: 'var(--muted)'}}>Correct: recognizing the cue and escalating is the priority.</span></div></div>
           </div>
           <div className="fstep">
             <span className="fnum">04</span>
@@ -278,7 +278,7 @@ export function LandingPage() {
           <div><span className="eyebrow on-dark">Signature · NGN</span><div className="rule" style={{background: 'linear-gradient(90deg,#c4b5fd,#fff)'}}></div></div>
           <div>
             <h2>The exam stopped asking what you remember</h2>
-            <p className="lede">The Next Generation NCLEX measures clinical judgment: whether you can recognize the cues that matter, weigh them, act, and evaluate what happened. NextWise questions are written around that sequence — which is the difference between practising judgment and drilling a question bank. What is live today and what is still in development is stated plainly below.</p>
+            <p className="lede">The Next Generation NCLEX measures clinical judgment: whether you can recognize the cues that matter, weigh them, act, and evaluate what happened. NextWise questions are written around that sequence, which is the difference between practising judgment and drilling a question bank. What is live today and what is still in development is stated plainly below.</p>
           </div>
         </div>
         <div className="path">
@@ -289,7 +289,7 @@ export function LandingPage() {
             <div className="pnode hi"><b>05</b><h4>Take action</h4><p>Which one comes first, and why?</p></div>
             <div className="pnode"><b>06</b><h4>Evaluate outcomes</h4><p>Did the action produce the expected result?</p></div>
         </div>
-        <div className="pathline"><svg viewBox="0 0 24 24" width="16" height="16" fill="none" stroke="currentColor" strokeWidth="2.2" strokeLinecap="round" strokeLinejoin="round"><path d="M5 12h14M13 6l6 6-6 6"/></svg> <span>Highlighted steps are the ones the heart failure item above measures — each question maps to its own subset.</span></div>
+        <div className="pathline"><svg viewBox="0 0 24 24" width="16" height="16" fill="none" stroke="currentColor" strokeWidth="2.2" strokeLinecap="round" strokeLinejoin="round"><path d="M5 12h14M13 6l6 6-6 6"/></svg> <span>Highlighted steps are the ones the heart failure item above measures. Each question maps to its own subset.</span></div>
         <div style={{marginTop: '44px', display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '20px', alignItems: 'start'}}>
           <div className="pnode" style={{padding: '24px'}}>
             <h4 style={{fontSize: '18px'}}>From scenario to judgment</h4>
@@ -334,7 +334,7 @@ export function LandingPage() {
             <div>
               <span className="eyebrow">01</span>
               <h3>Judgment, not recall</h3>
-              <p className="d">Questions are written from a clinical picture — findings, timing, and priority — so you practice deciding, not remembering.</p>
+              <p className="d">Questions are written from a clinical picture (findings, timing, and priority) so you practice deciding, not remembering.</p>
             </div>
             <div className="vis"><div className="ui" style={{boxShadow: 'var(--sh-1)'}}><div className="q" style={{padding: '16px'}}><div className="q-tags">
                 <span className="chip chip-out">Cardiovascular</span>
@@ -347,7 +347,7 @@ export function LandingPage() {
             <div>
               <span className="chip chip-tint" style={{height: '26px', padding: '0 12px'}}>02 · Core differentiator</span>
               <h3>Every option explained. Not just right or wrong.</h3>
-              <p className="d">You get the reasoning for why the correct answer is correct — and for why each distractor you did not pick is wrong. A grade tells you nothing you can use tomorrow. The reasoning is what transfers to the next question.</p>
+              <p className="d">You get the reasoning for why the correct answer is correct, and for why each distractor you did not pick is wrong. A grade tells you nothing you can use tomorrow. The reasoning is what transfers to the next question.</p>
               <div className="spot-proof">
                 <span className="chip chip-ok">4 of 4 options explained</span>
                 <span className="chip chip-out">Written by nursing educators</span>
@@ -387,7 +387,7 @@ export function LandingPage() {
             <div>
               <span className="eyebrow">03</span>
               <h3>It tells you what to study next</h3>
-              <p className="d">Most question banks hand you a score and leave the plan to you. NextWise reads your weakest category, then queues a specific, sized session on it — so you are never deciding what to study while you study.</p>
+              <p className="d">Most question banks hand you a score and leave the plan to you. NextWise reads your weakest category, then queues a specific, sized session on it, so you are never deciding what to study while you study.</p>
             </div>
             <div className="vis"><div className="side-card" style={{boxShadow: 'var(--sh-1)'}}>
             <div style={{display: 'flex', alignItems: 'center', justifyContent: 'space-between', gap: '12px'}}><span className="note">Weakest areas</span><span className="demo-flag">Demo data</span></div>
@@ -420,7 +420,7 @@ export function LandingPage() {
           <div><span className="eyebrow">Performance dashboard</span><div className="rule"></div></div>
           <div>
             <h2>It does not just score you. It tells you what to practice next.</h2>
-            <p className="lede">Readiness, accuracy, weak areas, clinical judgment performance, and progress over time — all of it feeding one recommendation. Reporting a 41% in Pharmacology is the easy part; turning it into the next session you sit down to is the point.</p>
+            <p className="lede">Readiness, accuracy, weak areas, clinical judgment performance, and progress over time: all of it feeding one recommendation. Reporting a 41% in Pharmacology is the easy part; turning it into the next session you sit down to is the point.</p>
             <div style={{marginTop: '16px'}}><span className="demo-flag"><svg viewBox="0 0 24 24" width="18" height="18" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><path d="M12 9v4M12 17h.01"/><path d="M10.3 3.9 1.8 18a2 2 0 0 0 1.7 3h17a2 2 0 0 0 1.7-3L13.7 3.9a2 2 0 0 0-3.4 0Z"/></svg> All figures below are demo data</span></div>
           </div>
         </div>
@@ -478,7 +478,7 @@ export function LandingPage() {
               </div>
               <div className="tile" style={{background: 'linear-gradient(140deg,#f2effe,#f7f5ff)', borderColor: 'rgba(92,70,224,.18)'}}>
                 <div className="tl"><span className="tile-l" style={{color: 'var(--primary)'}}>Recommended next practice</span><span className="chip chip-tint">The differentiator</span></div>
-                <p style={{fontSize: '15px', lineHeight: '1.6', marginTop: '12px'}}>10 questions on <strong>Pharmacology</strong> — your lowest category this week.</p>
+                <p style={{fontSize: '15px', lineHeight: '1.6', marginTop: '12px'}}>10 questions on <strong>Pharmacology</strong>, your lowest category this week.</p>
                 <p style={{fontSize: '12.5px', lineHeight: '1.55', color: 'var(--muted)', marginTop: '8px'}}>Generated from your own results. You do not have to build a study plan yourself.</p>
                 <Link className="btn btn-cta" style={{marginTop: '16px', width: '100%'}} to={ROUTES.register}>Practice this area</Link>
               </div>
@@ -562,9 +562,9 @@ export function LandingPage() {
           </div>
         </div>
         <div className="faq">
-          <details open><summary>Is NextWise for the NCLEX-RN?</summary><p>Yes — NextWise is built specifically for NCLEX-RN candidates. It is not a general nursing-exam bank. NCLEX-PN is not part of the current product and may be added later.</p></details>
-          <details><summary>Does NextWise include NGN practice?</summary><p>NextWise focuses on clinical judgment practice, which is what the Next Generation NCLEX measures. Available today: scenario-based clinical judgment questions in Multiple Choice and Select All That Apply formats. In development: the NGN item types — Matrix/Grid, Bow-Tie, Extended Multiple Response, Drag and Drop, Cloze, and Enhanced Hot Spot. Coming soon: NGN case studies. Anything not yet released is labelled as such in the app.</p></details>
-          <details><summary>What are clinical judgment questions?</summary><p>Questions that give you a clinical picture — the client, the timeline, the findings — and ask you to decide, rather than recall a fact. They test whether you can recognize the cues that matter, weigh them, act, and evaluate the result.</p></details>
+          <details open><summary>Is NextWise for the NCLEX-RN?</summary><p>Yes. NextWise is built specifically for NCLEX-RN candidates. It is not a general nursing-exam bank. NCLEX-PN is not part of the current product and may be added later.</p></details>
+          <details><summary>Does NextWise include NGN practice?</summary><p>NextWise focuses on clinical judgment practice, which is what the Next Generation NCLEX measures. Available today: scenario-based clinical judgment questions in Multiple Choice and Select All That Apply formats. In development: the NGN item types, including Matrix/Grid, Bow-Tie, Extended Multiple Response, Drag and Drop, Cloze, and Enhanced Hot Spot. Coming soon: NGN case studies. Anything not yet released is labelled as such in the app.</p></details>
+          <details><summary>What are clinical judgment questions?</summary><p>Questions that give you a clinical picture (the client, the timeline, the findings) and ask you to decide, rather than recall a fact. They test whether you can recognize the cues that matter, weigh them, act, and evaluate the result.</p></details>
           <details><summary>Are rationales included?</summary><p>Yes, on every answer choice. You get the reasoning for the correct answer and for each distractor, in plain clinical language, immediately after you submit.</p></details>
           <details><summary>Can I practice by topic?</summary><p>Yes. You can filter a session by nursing system, category, difficulty, available question type, and question count before you start.</p></details>
           <details><summary>Does NextWise track my weak areas?</summary><p>Yes. Accuracy accumulates by category and subcategory, and your weakest areas surface on the dashboard as a specific recommended next quiz.</p></details>
