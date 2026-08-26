@@ -35,10 +35,17 @@ export const DIFFICULTY_LABELS: Record<Difficulty, string> = {
 export interface AnswerChoice {
   id: string;
   choice_text: string;
-  is_correct: boolean;
-  display_order: number;
-  /** Shown inline directly under this option once the student submits — the primary explanation mechanism for MCQ/SATA, not a single combined blob. */
+  /**
+   * Both undefined until the student submits this question — GET
+   * /api/questions/ deliberately omits the answer key (see
+   * PublicAnswerChoiceSerializer on the backend), so a student can't read
+   * the correct answer from the network tab before answering. Populated in
+   * place by the SUBMIT_RESULT reducer action once
+   * questionsApi.submitAnswer() resolves for this question.
+   */
+  is_correct?: boolean;
   rationale?: string;
+  display_order: number;
 }
 
 export interface Question {
@@ -51,8 +58,5 @@ export interface Question {
   topic: string;
   nclex_client_needs_category: string;
   clinical_judgment_skill: string;
-  /** Question-level fallback rationale — superseded by AnswerChoice.rationale for MCQ/SATA/EMR, only still meaningful for non-choice-based question types. */
-  rationale_correct: string | null;
-  rationale_incorrect: string | null;
   answer_choices: AnswerChoice[];
 }

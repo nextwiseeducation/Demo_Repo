@@ -11,9 +11,10 @@ urlpatterns = [
     path("api/auth/", include("apps.accounts.urls")),  # register/login/logout/verify-email/password-reset/me
     path("api/payments/", include("apps.payments.urls")),  # Stripe webhook endpoint (stubbed, Phase 2)
     path("api/feedback/", include("apps.feedback.urls")),  # end-of-quiz survey + per-question issue reports
-    # apps.taxonomy / apps.questions / apps.quizzes have no urls.py yet —
-    # their models are complete (Milestone 1 scope) but the REST endpoints
-    # to read/write them are Milestone 2/3 scope, so nothing is wired here.
+    path("api/questions/", include("apps.questions.urls")),  # minimal read + grade endpoints so the quiz UI can use real content; full filtering/search is still Milestone 2/3 scope
+    # apps.taxonomy / apps.quizzes have no urls.py yet — their models are
+    # complete (Milestone 1 scope) but the REST endpoints to read/write them
+    # are Milestone 2/3 scope, so nothing is wired here.
 ]
 
 if settings.DEBUG:

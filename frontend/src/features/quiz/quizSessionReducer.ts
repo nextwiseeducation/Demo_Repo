@@ -1,8 +1,11 @@
 import type { Question } from "@/types/question";
+import type { SubmitAnswerResult } from "@/lib/api/questions";
 
 export interface AnswerState {
   selectedChoiceIds: string[];
   submitted: boolean;
+  /** Set once SUBMIT_RESULT lands — the backend's verdict, not recomputed client-side (the answer key isn't available client-side until then anyway). */
+  isCorrect?: boolean;
 }
 
 export interface QuizSessionState {
@@ -14,7 +17,7 @@ export interface QuizSessionState {
 type Action =
   | { type: "SELECT_SINGLE"; questionId: string; choiceId: string }
   | { type: "TOGGLE_MULTI"; questionId: string; choiceId: string }
-  | { type: "SUBMIT"; questionId: string }
+  | { type: "SUBMIT_RESULT"; questionId: string; result: SubmitAnswerResult }
   | { type: "NEXT" };
 
 export function createInitialState(questions: Question[]): QuizSessionState {
@@ -46,12 +49,29 @@ export function quizSessionReducer(state: QuizSessionState, action: Action): Qui
         answers: { ...state.answers, [action.questionId]: { selectedChoiceIds, submitted: false } },
       };
     }
-    case "SUBMIT": {
+    case "SUBMIT_RESULT": {
       const existing = state.answers[action.questionId];
       if (!existing) return state;
+      // Merges the revealed answer key into the matching question's
+      // answer_choices in place — MCQChoiceList/SATAChoiceList/
+      // QuizResultsPage already read choice.is_correct/choice.rationale
+      // directly and unconditionally once `submitted` is true, so this is
+      // the only place that needs to know those fields start out absent.
+      const resultById = new Map(action.result.choices.map((c) => [c.id, c]));
       return {
         ...state,
-        answers: { ...state.answers, [action.questionId]: { ...existing, submitted: true } },
+        answers: {
+          ...state.answers,
+          [action.questionId]: { ...existing, submitted: true, isCorrect: action.result.is_correct },
+        },
+        questions: state.questions.map((q) =>
+          q.id !== action.questionId
+            ? q
+            : {
+                ...q,
+                answer_choices: q.answer_choices.map((c) => ({ ...c, ...resultById.get(c.id) })),
+              },
+        ),
       };
     }
     case "NEXT":
@@ -59,16 +79,4 @@ export function quizSessionReducer(state: QuizSessionState, action: Action): Qui
     default:
       return state;
   }
-}
-
-/**
- * Simplest defensible SATA rule: the selected set must exactly match the
- * correct set. The schema has no partial-credit field, so this should be
- * validated against Milestone 3's real grading logic once it exists rather
- * than assumed to match production.
- */
-export function isAnswerCorrect(question: Question, selectedChoiceIds: string[]): boolean {
-  const correctIds = question.answer_choices.filter((c) => c.is_correct).map((c) => c.id).sort();
-  const selectedSorted = [...selectedChoiceIds].sort();
-  return correctIds.length === selectedSorted.length && correctIds.every((id, i) => id === selectedSorted[i]);
 }

@@ -1,3 +1,4 @@
+import { useMutation } from "@tanstack/react-query";
 import { useReducer } from "react";
 import { Navigate, useLocation, useNavigate } from "react-router-dom";
 
@@ -6,7 +7,8 @@ import { QuestionCard } from "@/features/quiz/components/QuestionCard";
 import { QuizProgressBar } from "@/features/quiz/components/QuizProgressBar";
 import { SATAChoiceList } from "@/features/quiz/components/SATAChoiceList";
 import { UnsupportedQuestionTypeNotice } from "@/features/quiz/components/UnsupportedQuestionTypeNotice";
-import { createInitialState, isAnswerCorrect, quizSessionReducer } from "@/features/quiz/quizSessionReducer";
+import { createInitialState, quizSessionReducer } from "@/features/quiz/quizSessionReducer";
+import * as questionsApi from "@/lib/api/questions";
 import { ROUTES } from "@/lib/constants";
 import type { Question } from "@/types/question";
 import type { QuestionResponse, QuizFilterConfig } from "@/types/quiz";
@@ -40,14 +42,24 @@ function QuizSessionInner({ questions }: { questions: Question[] }) {
   const isLastQuestion = session.currentIndex === session.questions.length - 1;
   const isSupported = question.question_type === "MCQ" || question.question_type === "SATA";
 
+  const submitMutation = useMutation({
+    mutationFn: ({ questionId, selectedChoiceIds }: { questionId: string; selectedChoiceIds: string[] }) =>
+      questionsApi.submitAnswer(questionId, selectedChoiceIds),
+    onSuccess: (result, { questionId }) => dispatch({ type: "SUBMIT_RESULT", questionId, result }),
+  });
+
   function goNextOrFinish() {
     if (isLastQuestion) {
+      // By now every answered question already has its answer key merged
+      // into session.questions (see quizSessionReducer's SUBMIT_RESULT) —
+      // a.isCorrect is the backend's own verdict from that same response,
+      // not recomputed here.
       const responses: QuestionResponse[] = session.questions.map((q) => {
         const a = session.answers[q.id];
         return {
           question_id: q.id,
           selected_choice_ids: a?.selectedChoiceIds ?? [],
-          is_correct: a ? isAnswerCorrect(q, a.selectedChoiceIds) : false,
+          is_correct: a?.isCorrect ?? false,
         };
       });
       navigate(ROUTES.quizResults, { state: { questions: session.questions, responses } });
@@ -90,10 +102,10 @@ function QuizSessionInner({ questions }: { questions: Question[] }) {
               <button
                 type="button"
                 className="btn-primary"
-                disabled={selectedIds.length === 0}
-                onClick={() => dispatch({ type: "SUBMIT", questionId: question.id })}
+                disabled={selectedIds.length === 0 || submitMutation.isPending}
+                onClick={() => submitMutation.mutate({ questionId: question.id, selectedChoiceIds: selectedIds })}
               >
-                Submit answer
+                {submitMutation.isPending ? "Submitting..." : "Submit answer"}
               </button>
             </>
           ) : (

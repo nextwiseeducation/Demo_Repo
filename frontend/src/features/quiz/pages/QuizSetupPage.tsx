@@ -1,14 +1,14 @@
+import { useQuery } from "@tanstack/react-query";
 import { useState } from "react";
 import { useNavigate } from "react-router-dom";
 
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
-import { MOCK_QUESTIONS } from "@/features/quiz/data/mockQuestions";
+import * as questionsApi from "@/lib/api/questions";
 import { ROUTES } from "@/lib/constants";
 import { cn } from "@/lib/utils";
 import { DIFFICULTY_LABELS, QUESTION_TYPE_LABELS, SUPPORTED_QUESTION_TYPES, type Difficulty, type QuestionType } from "@/types/question";
 import type { QuizFilterConfig } from "@/types/quiz";
 
-const NURSING_SYSTEMS = ["Cardiovascular", "Respiratory", "Endocrine", "Pharmacology", "Renal"];
 const QUESTION_COUNTS = [5, 10, 20];
 const ALL_TYPES = Object.keys(QUESTION_TYPE_LABELS) as QuestionType[];
 
@@ -26,16 +26,23 @@ export function QuizSetupPage() {
   const [questionTypes, setQuestionTypes] = useState<QuestionType[]>(["MCQ", "SATA"]);
   const [questionCount, setQuestionCount] = useState(5);
 
+  const questionsQuery = useQuery({ queryKey: ["questions"], queryFn: questionsApi.listQuestions });
+  const allQuestions = questionsQuery.data ?? [];
+  // Built from whatever's actually in the bank rather than a fixed list —
+  // a hardcoded system list would drift out of sync with real content the
+  // moment the content team adds a system this dropdown doesn't know about.
+  const nursingSystems = [...new Set(allQuestions.map((q) => q.nursing_system))].sort();
+
   function toggleType(type: QuestionType) {
     if (!SUPPORTED_QUESTION_TYPES.includes(type)) return;
     setQuestionTypes((prev) => (prev.includes(type) ? prev.filter((t) => t !== type) : [...prev, type]));
   }
 
   function handleStart() {
-    let pool = MOCK_QUESTIONS.filter((q) => questionTypes.length === 0 || questionTypes.includes(q.question_type));
+    let pool = allQuestions.filter((q) => questionTypes.length === 0 || questionTypes.includes(q.question_type));
     if (nursingSystem) pool = pool.filter((q) => q.nursing_system === nursingSystem);
     if (difficulty) pool = pool.filter((q) => q.difficulty === difficulty);
-    if (pool.length === 0) pool = MOCK_QUESTIONS.filter((q) => SUPPORTED_QUESTION_TYPES.includes(q.question_type));
+    if (pool.length === 0) pool = allQuestions.filter((q) => SUPPORTED_QUESTION_TYPES.includes(q.question_type));
 
     const filterConfig: QuizFilterConfig = {
       nursing_system: nursingSystem,
@@ -48,8 +55,9 @@ export function QuizSetupPage() {
   }
 
   const selectedTypeLabels = questionTypes.map((t) => QUESTION_TYPE_LABELS[t]);
-  const summaryText =
-    questionTypes.length === 0
+  const summaryText = questionsQuery.isPending
+    ? "Loading questions..."
+    : questionTypes.length === 0
       ? "Select at least one question type to continue"
       : `${questionCount} ${difficulty ? `${DIFFICULTY_LABELS[difficulty].toLowerCase()} ` : ""}question${questionCount === 1 ? "" : "s"} · ${joinLabels(selectedTypeLabels)}`;
 
@@ -57,7 +65,11 @@ export function QuizSetupPage() {
     <div className="page">
       <div>
         <h1 className="page-title">Start a practice quiz</h1>
-        <p className="page-sub">Using a sample question set for this preview, not the full content-team bank.</p>
+        <p className="page-sub">
+          {questionsQuery.isError
+            ? "Couldn't load the question bank. Try refreshing the page."
+            : "MCQ and SATA questions are interactive today; other NGN formats are shown but not yet answerable."}
+        </p>
       </div>
 
       <div className="card">
@@ -74,7 +86,7 @@ export function QuizSetupPage() {
                 </SelectTrigger>
                 <SelectContent>
                   <SelectItem value="any">All systems</SelectItem>
-                  {NURSING_SYSTEMS.map((system) => (
+                  {nursingSystems.map((system) => (
                     <SelectItem key={system} value={system}>
                       {system}
                     </SelectItem>
@@ -142,7 +154,12 @@ export function QuizSetupPage() {
 
           <div className="summary">
             <span className="summary-text">{summaryText}</span>
-            <button type="button" className="btn-primary" disabled={questionTypes.length === 0} onClick={handleStart}>
+            <button
+              type="button"
+              className="btn-primary"
+              disabled={questionTypes.length === 0 || questionsQuery.isPending || allQuestions.length === 0}
+              onClick={handleStart}
+            >
               Start practice quiz
             </button>
           </div>
