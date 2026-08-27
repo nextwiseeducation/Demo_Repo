@@ -23,7 +23,10 @@ export function MarketingLayout() {
       <header>
         <div className="wrap hdr">
           <Link to={ROUTES.home} aria-label="NextWise home" onClick={() => setMenuOpen(false)}>
-            <img src={logoFull} alt="NextWise" />
+            {/* Inline height (not the .hdr img rule in LandingPage.css) so this
+                matches AppShell's/AuthLayout's 40px logo without editing a
+                shared stylesheet file this change doesn't otherwise own. */}
+            <img src={logoFull} alt="NextWise" style={{ height: 40, width: "auto" }} />
           </Link>
           <nav>
             {NAV_LINKS.map((link) => (
@@ -97,6 +100,7 @@ export function MarketingLayout() {
                 <span className="foot-col-label">Legal</span>
                 <Link to={ROUTES.privacyPolicy}>Privacy Policy</Link>
                 <Link to={ROUTES.termsAndConditions}>Terms and Conditions</Link>
+                <Link to={`${ROUTES.termsAndConditions}#nclex-examination-disclaimer`}>NCLEX Disclaimer</Link>
                 <Link to={ROUTES.accessibility}>Accessibility</Link>
               </div>
             </div>

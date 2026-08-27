@@ -8,7 +8,7 @@ export function AuthLayout() {
     <div className="grid min-h-screen lg:grid-cols-2">
       <div className="flex flex-col justify-between p-6 sm:p-8">
         <Link to={ROUTES.home} aria-label="NextWise home">
-          <img src={logoFull} alt="NextWise" className="h-9 w-auto" />
+          <img src={logoFull} alt="NextWise" className="h-10 w-auto" />
         </Link>
         <div className="mx-auto w-full max-w-sm py-12">
           <Outlet />

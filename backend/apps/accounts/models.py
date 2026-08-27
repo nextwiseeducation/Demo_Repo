@@ -127,6 +127,30 @@ class User(UUIDPKMixin, AbstractBaseUser, PermissionsMixin):
         max_length=20, choices=SubscriptionStatus.choices, default=SubscriptionStatus.FREE
     )
 
+    # Legal/liability record: proves a specific student affirmatively
+    # acknowledged the NCLEX Examination Disclaimer (that NextWise provides
+    # independent prep content, not real/leaked NCLEX exam questions) at the
+    # moment they registered. A client-side checkbox alone proves nothing
+    # once a dispute arises — this is the server-side audit trail that
+    # backs it up. Set exactly once, at registration (see
+    # RegisterSerializer.create), and never modified afterward — it is a
+    # historical record of "did this acceptance happen," not a live flag.
+    disclaimer_accepted_at = models.DateTimeField(null=True, blank=True)
+    # Which version of the disclaimer text the user agreed to (current
+    # constant: "1.0"). Recorded alongside the timestamp so that if the
+    # disclaimer wording is ever revised, we can tell which users only
+    # agreed to an older version and are candidates for re-acknowledgment —
+    # that re-ack flow isn't built yet, but storing the version now avoids
+    # a migration/backfill problem later when it is.
+    disclaimer_version = models.CharField(max_length=20, null=True, blank=True)
+
+    # Same reasoning as disclaimer_accepted_at/disclaimer_version above, for
+    # the separate Privacy Policy + Terms and Conditions acceptance
+    # checkbox (a distinct legal document/consent from the NCLEX disclaimer,
+    # so it gets its own record rather than being folded into that one).
+    terms_accepted_at = models.DateTimeField(null=True, blank=True)
+    terms_version = models.CharField(max_length=20, null=True, blank=True)
+
     # Attaches the custom manager so User.objects.create_user(...) /
     # .create_superuser(...) work — without this, Django would use the
     # default manager, which doesn't know about email-based creation.

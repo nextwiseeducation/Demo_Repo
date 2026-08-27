@@ -88,6 +88,7 @@ export function AppShell() {
             <Link to={ROUTES.faq}>FAQ</Link>
             <Link to={ROUTES.privacyPolicy}>Privacy Policy</Link>
             <Link to={ROUTES.termsAndConditions}>Terms and Conditions</Link>
+            <Link to={`${ROUTES.termsAndConditions}#nclex-examination-disclaimer`}>NCLEX Disclaimer</Link>
             <Link to={ROUTES.accessibility}>Accessibility</Link>
           </nav>
         </div>

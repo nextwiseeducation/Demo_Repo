@@ -6,6 +6,8 @@ export interface RegisterPayload {
   email: string;
   password: string;
   full_name: string;
+  accepted_disclaimer: boolean;
+  accepted_terms: boolean;
 }
 
 export function register(payload: RegisterPayload) {

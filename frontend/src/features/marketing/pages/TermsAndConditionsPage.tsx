@@ -5,6 +5,7 @@ const SECTIONS = [
   { id: "eligibility", title: "Eligibility" },
   { id: "account-registration", title: "Account Registration and Security" },
   { id: "access-and-subscriptions", title: "Access and Subscriptions" },
+  { id: "nclex-examination-disclaimer", title: "NCLEX Examination Disclaimer" },
   { id: "acceptable-use", title: "Acceptable Use" },
   { id: "intellectual-property", title: "Intellectual Property" },
   { id: "user-submitted-content", title: "User-Submitted Content" },
@@ -18,20 +19,51 @@ const SECTIONS = [
   { id: "contact-us", title: "Contact Us" },
 ];
 
-export function TermsAndConditionsPage() {
+/**
+ * Just the disclaimer's paragraphs — reused both inside the full T&C
+ * section below AND as a standalone modal on the registration page
+ * (LegalLinkModal in RegisterPage.tsx), so this exact legal text has one
+ * source of truth rather than being duplicated into a second place.
+ */
+export function NclexDisclaimerBody() {
   return (
-    <LegalPageLayout
-      title="Terms and Conditions"
-      lastUpdated="August 23, 2026"
-      sections={SECTIONS}
-      intro={
-        <p>
-          These Terms and Conditions ("Terms") govern your access to and use of the NextWise Education website and
-          platform (together, "NextWise," "the Service"). By creating an account or using the Service, you agree to
-          be bound by these Terms. If you do not agree, please do not use the Service.
-        </p>
-      }
-    >
+    <>
+      <p>
+        NextWise is an independent NCLEX-RN® preparation platform. NextWise does not provide, possess, have access
+        to, or reproduce actual NCLEX examination questions or secure examination content. All practice questions
+        and educational materials provided through NextWise are independently developed for educational and
+        preparation purposes and are not intended to reproduce or predict questions that may appear on the actual
+        NCLEX examination.
+      </p>
+      <p>
+        If a question, concept, topic, clinical scenario, or similar material encountered while using NextWise
+        happens to appear on your NCLEX examination, this does not mean that the examination content was obtained
+        from, provided by, or disclosed by NextWise. NextWise does not guarantee that any specific question,
+        concept, topic, or clinical scenario will appear on the NCLEX examination.
+      </p>
+      <p>
+        NextWise makes no guarantee of examination success, a passing result, or any particular examination
+        outcome. Your use of NextWise is solely for educational and examination-preparation purposes. To the
+        extent permitted by applicable law, NextWise is not responsible for the content, wording, or occurrence of
+        questions presented on an individual's actual examination or for any examination result.
+      </p>
+      <p>
+        Users must not submit, upload, reproduce, or share actual NCLEX examination questions, answer choices,
+        screenshots, photographs, or other secure examination content through NextWise.
+      </p>
+      <p>
+        By using NextWise, you acknowledge and agree that NextWise is an independent preparation resource and that
+        no specific NextWise question or educational material is promised or represented to appear on your actual
+        examination.
+      </p>
+    </>
+  );
+}
+
+/** Just the section content, no LegalPageLayout wrapper — see PrivacyPolicyBody's comment for why. */
+export function TermsAndConditionsBody() {
+  return (
+    <>
       <LegalSection id="acceptance-of-terms" title="Acceptance of Terms">
         <p>
           By registering for an account or otherwise accessing NextWise, you confirm that you have read, understood,
@@ -68,6 +100,10 @@ export function TermsAndConditionsPage() {
           pricing, billing terms, and refund policy, and those terms will apply going forward from that point. They
           are not part of these Terms today.
         </p>
+      </LegalSection>
+
+      <LegalSection id="nclex-examination-disclaimer" title="NCLEX Examination Disclaimer">
+        <NclexDisclaimerBody />
       </LegalSection>
 
       <LegalSection id="acceptable-use" title="Acceptable Use">
@@ -164,6 +200,25 @@ export function TermsAndConditionsPage() {
           .
         </p>
       </LegalSection>
+    </>
+  );
+}
+
+export function TermsAndConditionsPage() {
+  return (
+    <LegalPageLayout
+      title="Terms and Conditions"
+      lastUpdated="August 23, 2026"
+      sections={SECTIONS}
+      intro={
+        <p>
+          These Terms and Conditions ("Terms") govern your access to and use of the NextWise Education website and
+          platform (together, "NextWise," "the Service"). By creating an account or using the Service, you agree to
+          be bound by these Terms. If you do not agree, please do not use the Service.
+        </p>
+      }
+    >
+      <TermsAndConditionsBody />
     </LegalPageLayout>
   );
 }

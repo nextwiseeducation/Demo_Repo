@@ -160,6 +160,12 @@ class Question(UUIDPKMixin, TimeStampedMixin, models.Model):
     # rationale — optional, free text rather than a structured citation
     # model, since Phase 1 has no requirement to parse/validate citations.
     reference = models.TextField(null=True, blank=True)
+    # A short, single "big idea" the student should walk away with — shown
+    # in the results review beneath the rationale. Optional and not
+    # required at question creation: the content team populates this
+    # during a later authoring pass, not required for a question to go
+    # live.
+    key_takeaway = models.TextField(null=True, blank=True)
 
     # Soft-delete flag: an inactive question is excluded from quizzes
     # without deleting the row (and its historical StudentResponseLog

@@ -13,21 +13,15 @@ const SECTIONS = [
   { id: "contact-us", title: "Contact Us" },
 ];
 
-export function PrivacyPolicyPage() {
+/**
+ * Just the section content, no LegalPageLayout wrapper — reused by the full
+ * PrivacyPolicyPage below AND by the registration-page modal (LegalLinkModal
+ * in RegisterPage.tsx), so the actual policy text has exactly one source of
+ * truth instead of being copy-pasted into a second place that could drift.
+ */
+export function PrivacyPolicyBody() {
   return (
-    <LegalPageLayout
-      title="Privacy Policy"
-      lastUpdated="August 23, 2026"
-      sections={SECTIONS}
-      intro={
-        <p>
-          NextWise Education ("NextWise," "we," "us," or "our") provides an online NCLEX-RN and NCLEX-PN exam
-          preparation platform. This Privacy Policy explains what personal information we collect, how we use it,
-          and the choices you have. By creating an account or otherwise using NextWise, you agree to the practices
-          described here.
-        </p>
-      }
-    >
+    <>
       <LegalSection id="information-we-collect" title="Information We Collect">
         <p>We collect information in the following ways:</p>
         <ul>
@@ -154,6 +148,26 @@ export function PrivacyPolicyPage() {
           .
         </p>
       </LegalSection>
+    </>
+  );
+}
+
+export function PrivacyPolicyPage() {
+  return (
+    <LegalPageLayout
+      title="Privacy Policy"
+      lastUpdated="August 23, 2026"
+      sections={SECTIONS}
+      intro={
+        <p>
+          NextWise Education ("NextWise," "we," "us," or "our") provides an online NCLEX-RN and NCLEX-PN exam
+          preparation platform. This Privacy Policy explains what personal information we collect, how we use it,
+          and the choices you have. By creating an account or otherwise using NextWise, you agree to the practices
+          described here.
+        </p>
+      }
+    >
+      <PrivacyPolicyBody />
     </LegalPageLayout>
   );
 }

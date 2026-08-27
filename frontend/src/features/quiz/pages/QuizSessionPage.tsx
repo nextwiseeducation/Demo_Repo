@@ -1,9 +1,10 @@
 import { useMutation } from "@tanstack/react-query";
-import { useReducer } from "react";
+import { useEffect, useReducer, useRef } from "react";
 import { Navigate, useLocation, useNavigate } from "react-router-dom";
 
 import { MCQChoiceList } from "@/features/quiz/components/MCQChoiceList";
 import { QuestionCard } from "@/features/quiz/components/QuestionCard";
+import { QuestionFeedbackBar } from "@/features/quiz/components/QuestionFeedbackBar";
 import { QuizProgressBar } from "@/features/quiz/components/QuizProgressBar";
 import { SATAChoiceList } from "@/features/quiz/components/SATAChoiceList";
 import { UnsupportedQuestionTypeNotice } from "@/features/quiz/components/UnsupportedQuestionTypeNotice";
@@ -28,12 +29,25 @@ export function QuizSessionPage() {
     return <Navigate to={ROUTES.quizSetup} replace />;
   }
 
-  return <QuizSessionInner questions={state.questions} />;
+  return <QuizSessionInner questions={state.questions} filterConfig={state.filterConfig} />;
 }
 
-function QuizSessionInner({ questions }: { questions: Question[] }) {
+function QuizSessionInner({ questions, filterConfig }: { questions: Question[]; filterConfig: QuizFilterConfig }) {
   const navigate = useNavigate();
   const [session, dispatch] = useReducer(quizSessionReducer, createInitialState(questions));
+  // Wall-clock start of this session — diffed at finish to report total
+  // time spent to the results page. A ref (not state) since it's write-once
+  // and reading it never needs to trigger a re-render.
+  const startedAtRef = useRef(Date.now());
+  // Wall-clock start of the *currently displayed* question — reset below
+  // whenever currentIndex changes. Separate from startedAtRef (total-quiz
+  // timer) on purpose: this is purely "when did this question first render",
+  // orthogonal to answer/session state, so it lives outside the reducer.
+  const questionStartedAtRef = useRef(Date.now());
+  // Captured once, synchronously, at the moment "Submit answer" is clicked —
+  // not recomputed on later re-renders, so it doesn't keep growing while the
+  // feedback bar sits on screen or the student lingers before "Next question".
+  const questionTimeSpentRef = useRef(0);
 
   const question = session.questions[session.currentIndex];
   const answer = session.answers[question.id];
@@ -42,11 +56,23 @@ function QuizSessionInner({ questions }: { questions: Question[] }) {
   const isLastQuestion = session.currentIndex === session.questions.length - 1;
   const isSupported = question.question_type === "MCQ" || question.question_type === "SATA";
 
+  useEffect(() => {
+    questionStartedAtRef.current = Date.now();
+  }, [session.currentIndex]);
+
   const submitMutation = useMutation({
     mutationFn: ({ questionId, selectedChoiceIds }: { questionId: string; selectedChoiceIds: string[] }) =>
       questionsApi.submitAnswer(questionId, selectedChoiceIds),
     onSuccess: (result, { questionId }) => dispatch({ type: "SUBMIT_RESULT", questionId, result }),
   });
+
+  // Running accuracy across every question submitted so far this session
+  // (including the one just answered) — no reducer plumbing needed, this
+  // folds straight out of session.answers.
+  const answeredSoFar = Object.values(session.answers).filter((a) => a.submitted);
+  const correctSoFar = answeredSoFar.filter((a) => a.isCorrect).length;
+  const accuracyPercent =
+    answeredSoFar.length > 0 ? Math.round((correctSoFar / answeredSoFar.length) * 100) : 0;
 
   function goNextOrFinish() {
     if (isLastQuestion) {
@@ -62,7 +88,10 @@ function QuizSessionInner({ questions }: { questions: Question[] }) {
           is_correct: a?.isCorrect ?? false,
         };
       });
-      navigate(ROUTES.quizResults, { state: { questions: session.questions, responses } });
+      const totalTimeSeconds = Math.round((Date.now() - startedAtRef.current) / 1000);
+      navigate(ROUTES.quizResults, {
+        state: { questions: session.questions, responses, filterConfig, totalTimeSeconds },
+      });
       return;
     }
     dispatch({ type: "NEXT" });
@@ -94,6 +123,15 @@ function QuizSessionInner({ questions }: { questions: Question[] }) {
         <UnsupportedQuestionTypeNotice questionType={question.question_type} onSkip={goNextOrFinish} />
       )}
 
+      {isSupported && submitted && (
+        <QuestionFeedbackBar
+          isCorrect={answer?.isCorrect ?? false}
+          accuracyPercent={accuracyPercent}
+          timeSpentSeconds={questionTimeSpentRef.current}
+          updatedAt={question.updated_at}
+        />
+      )}
+
       {isSupported && (
         <div className="actions">
           {!submitted ? (
@@ -103,7 +141,10 @@ function QuizSessionInner({ questions }: { questions: Question[] }) {
                 type="button"
                 className="btn-primary"
                 disabled={selectedIds.length === 0 || submitMutation.isPending}
-                onClick={() => submitMutation.mutate({ questionId: question.id, selectedChoiceIds: selectedIds })}
+                onClick={() => {
+                  questionTimeSpentRef.current = Math.round((Date.now() - questionStartedAtRef.current) / 1000);
+                  submitMutation.mutate({ questionId: question.id, selectedChoiceIds: selectedIds });
+                }}
               >
                 {submitMutation.isPending ? "Submitting..." : "Submit answer"}
               </button>

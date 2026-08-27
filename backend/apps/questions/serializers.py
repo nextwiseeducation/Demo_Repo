@@ -38,4 +38,6 @@ class QuestionListSerializer(serializers.ModelSerializer):
             "nclex_client_needs_category",
             "clinical_judgment_skill",
             "answer_choices",
+            "key_takeaway",
+            "updated_at",
         ]

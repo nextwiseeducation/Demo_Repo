@@ -59,4 +59,8 @@ export interface Question {
   nclex_client_needs_category: string;
   clinical_judgment_skill: string;
   answer_choices: AnswerChoice[];
+  /** Short "big idea" the student should walk away with. Optional — most questions won't have one yet. */
+  key_takeaway?: string | null;
+  /** ISO 8601 datetime string — auto-maintained by TimeStampedMixin on every save. */
+  updated_at: string;
 }
