@@ -12,16 +12,19 @@ export interface QuizSessionState {
   questions: Question[];
   currentIndex: number;
   answers: Record<string, AnswerState>;
+  /** Question ids the student has "marked for review" (UWorld's Marked flag) — independent of answers. */
+  markedIds: Set<string>;
 }
 
 type Action =
   | { type: "SELECT_SINGLE"; questionId: string; choiceId: string }
   | { type: "TOGGLE_MULTI"; questionId: string; choiceId: string }
   | { type: "SUBMIT_RESULT"; questionId: string; result: SubmitAnswerResult }
+  | { type: "MARK_TOGGLED"; questionId: string; marked: boolean }
   | { type: "NEXT" };
 
 export function createInitialState(questions: Question[]): QuizSessionState {
-  return { questions, currentIndex: 0, answers: {} };
+  return { questions, currentIndex: 0, answers: {}, markedIds: new Set() };
 }
 
 export function quizSessionReducer(state: QuizSessionState, action: Action): QuizSessionState {
@@ -73,6 +76,12 @@ export function quizSessionReducer(state: QuizSessionState, action: Action): Qui
               },
         ),
       };
+    }
+    case "MARK_TOGGLED": {
+      const markedIds = new Set(state.markedIds);
+      if (action.marked) markedIds.add(action.questionId);
+      else markedIds.delete(action.questionId);
+      return { ...state, markedIds };
     }
     case "NEXT":
       return { ...state, currentIndex: Math.min(state.currentIndex + 1, state.questions.length - 1) };

@@ -9,15 +9,19 @@ import { QuizFeedbackModal } from "@/features/quiz/components/QuizFeedbackModal"
 import { QuizResultsSummary } from "@/features/quiz/components/QuizResultsSummary";
 import { ROUTES } from "@/lib/constants";
 import type { Question } from "@/types/question";
-import type { QuestionResponse, QuizFilterConfig } from "@/types/quiz";
+import type { QuestionResponse } from "@/types/quiz";
 
 interface LocationState {
   questions: Question[];
   responses: QuestionResponse[];
-  /** Absent for a link built before this was forwarded (e.g. an old bookmark) — everything below degrades gracefully. */
-  filterConfig?: QuizFilterConfig;
   /** Absent for a link built before this was forwarded — the summary just omits the time stat. */
   totalTimeSeconds?: number;
+}
+
+/** Every question shares one nursing_system -> show it; otherwise this was a mixed-category quiz. */
+function topicLabelFor(questions: Question[]): string {
+  const systems = new Set(questions.map((q) => q.nursing_system));
+  return systems.size === 1 ? questions[0].nursing_system : "Mixed Practice";
 }
 
 type ReviewFilter = "all" | "incorrect";
@@ -38,7 +42,7 @@ export function QuizResultsPage() {
     return <Navigate to={ROUTES.quizSetup} replace />;
   }
 
-  const { questions, responses, filterConfig, totalTimeSeconds } = state;
+  const { questions, responses, totalTimeSeconds } = state;
   const correctCount = responses.filter((r) => r.is_correct).length;
   const incorrectCount = responses.length - correctCount;
 
@@ -67,7 +71,7 @@ export function QuizResultsPage() {
       <div className="rounded-xl border border-accent/30 bg-accent/10 px-4 py-3 text-sm text-foreground/90">
         <div className="flex items-start gap-2">
           <Info className="mt-0.5 h-4 w-4 shrink-0 text-accent" />
-          <p>This is a practice summary from sample questions. It isn't saved to your account.</p>
+          <p>Your results are saved to your account and count toward your progress.</p>
         </div>
       </div>
 
@@ -76,7 +80,7 @@ export function QuizResultsPage() {
         incorrectCount={incorrectCount}
         totalCount={responses.length}
         totalTimeSeconds={totalTimeSeconds}
-        filterConfig={filterConfig}
+        topicLabel={topicLabelFor(questions)}
         onReviewIncorrect={handleReviewIncorrect}
       />
 

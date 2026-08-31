@@ -1,23 +1,46 @@
-import type { Difficulty, Question, QuestionType } from "./question";
+import type { Question } from "./question";
 
-/** Mirrors QuizSession.filter_config on the backend, so a real API swap later is a drop-in. */
-export interface QuizFilterConfig {
-  nursing_system: string | null;
-  /** Multi-select — empty array means "any difficulty," not "none selected." */
-  difficulty: Difficulty[];
-  question_types: QuestionType[];
+export type QuestionFormat = "TRADITIONAL" | "NGN";
+export type QuestionModeStatus = "UNUSED" | "INCORRECT" | "MARKED" | "OMITTED" | "CORRECT";
+
+export const QUESTION_MODE_STATUS_LABELS: Record<QuestionModeStatus, string> = {
+  UNUSED: "Unused",
+  INCORRECT: "Incorrect",
+  MARKED: "Marked",
+  OMITTED: "Omitted",
+  CORRECT: "Correct",
+};
+
+/** The full filter selection driving both live counts (getFacetCounts) and quiz creation (createQuizSession). */
+export interface QuizFilters {
+  question_types: QuestionFormat[];
+  question_mode: "STANDARD" | "CUSTOM";
+  status_filters: QuestionModeStatus[];
+  domains: number[];
+  nursing_systems: number[];
+  nclex_client_needs_subcategories: number[];
+  is_tutor_mode: boolean;
+  is_timed: boolean;
+  time_limit_minutes: number | null;
   question_count: number;
-  topic: string | null;
-  nclex_client_needs_category: string | null;
-  clinical_judgment_skill: string | null;
 }
 
-/** Client-only mock of a QuizSession — nothing here is persisted to the backend. */
-export interface MockQuizSession {
-  filter_config: QuizFilterConfig;
-  questions: Question[];
+export interface FacetCounts {
+  question_types: Record<QuestionFormat, { unused: number; total: number }>;
+  question_mode: Record<QuestionModeStatus, { count: number; ngn_count: number }>;
+  domains: { id: number; name: string; count: number }[];
+  nursing_systems: { id: number; name: string; count: number }[];
+  nclex_client_needs_subcategories: { id: number; name: string; count: number }[];
+}
+
+/** The real, server-created quiz attempt — replaces the old client-only MockQuizSession. */
+export interface QuizSession {
+  id: string;
   current_question_index: number;
   is_complete: boolean;
+  started_at: string;
+  filter_config: QuizFilters;
+  questions: Question[];
 }
 
 export interface QuestionResponse {

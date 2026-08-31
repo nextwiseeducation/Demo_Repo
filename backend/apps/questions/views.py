@@ -30,7 +30,7 @@ class QuestionListView(generics.ListAPIView):
 
     queryset = (
         Question.objects.filter(is_active=True)
-        .select_related("nursing_system", "topic", "nclex_client_needs_category")
+        .select_related("domain", "nursing_system", "topic", "nclex_client_needs_category", "nclex_client_needs_subcategory")
         .prefetch_related("answer_choices")
     )
     serializer_class = QuestionListSerializer
@@ -42,10 +42,14 @@ class QuestionSubmitView(APIView):
     answer key (is_correct + rationale per choice) now that the student has
     actually answered.
 
-    Stateless: nothing is persisted (no StudentResponseLog row). Doing that
-    for real needs a QuizSession to attach it to, and QuizSession has no API
-    of its own yet (Milestone 3 scope per CLAUDE.md) — the quiz UI already
-    tells students results aren't saved in this preview.
+    Stateless: nothing is persisted (no StudentResponseLog row). The real,
+    session-aware graded/persisted path now lives in
+    apps.quizzes.views.QuizAnswerSubmitView (POST
+    /api/quizzes/sessions/<id>/answers/), which every real quiz-taking flow
+    uses instead of this one. This endpoint is kept deliberately as a
+    stateless preview path (e.g. future content-team preview tooling that
+    wants to test a question without it counting as an attempt) — not dead
+    code, just not what a student's real quiz hits anymore.
 
     KNOWN RESIDUAL RISK — read before extending this endpoint.
     Grading is the moment the answer key becomes visible, and because
@@ -57,10 +61,12 @@ class QuestionSubmitView(APIView):
     merely skipping a question no longer returns its answers), and the
     "question_submit" throttle caps the rate at 300/hour — far above a real
     quiz-taker, far below a practical scrape of thousands of questions.
-    Neither is a fix. The actual fix arrives with Milestone 3: grade only
-    within a QuizSession, and write a StudentResponseLog row each time, so
-    that answers are revealed once per question per attempt and any
-    harvesting shows up as data rather than passing unseen.
+    Neither is a fix by itself — that risk is specific to THIS stateless
+    endpoint. QuizAnswerSubmitView (see above) is the actual fix: it grades
+    only within a real QuizSession and writes a StudentResponseLog row each
+    time, so answers are revealed once per question per attempt and any
+    harvesting shows up as data rather than passing unseen. This endpoint
+    stays as-is, residual risk and all, for its narrower preview use case.
 
     Grading itself lives in services.py, not here — Milestone 3's quiz
     engine and Phase 2's analytics need the identical rule, and SATA

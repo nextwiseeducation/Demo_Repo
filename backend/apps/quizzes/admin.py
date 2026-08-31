@@ -1,6 +1,14 @@
 from django.contrib import admin
 
-from .models import QuizSession, StudentResponseLog
+from .models import Bookmark, QuizSession, QuizSessionQuestion, StudentResponseLog
+
+
+class QuizSessionQuestionInline(admin.TabularInline):
+    # Lets an admin see a session's actual drawn question order directly on
+    # the QuizSession edit page, rather than needing to browse
+    # QuizSessionQuestion separately.
+    model = QuizSessionQuestion
+    extra = 0
 
 
 @admin.register(QuizSession)
@@ -14,10 +22,17 @@ class QuizSessionAdmin(admin.ModelAdmin):
     # field — lets an admin search sessions by the student's email without
     # a dedicated search field on QuizSession itself.
     search_fields = ("student__email",)
+    inlines = [QuizSessionQuestionInline]
 
 
 @admin.register(StudentResponseLog)
 class StudentResponseLogAdmin(admin.ModelAdmin):
     list_display = ("student", "question", "is_correct", "time_taken_seconds", "answered_at")
     list_filter = ("is_correct",)
+    search_fields = ("student__email",)
+
+
+@admin.register(Bookmark)
+class BookmarkAdmin(admin.ModelAdmin):
+    list_display = ("student", "question", "created_at")
     search_fields = ("student__email",)

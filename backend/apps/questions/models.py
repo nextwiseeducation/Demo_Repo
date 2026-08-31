@@ -7,6 +7,7 @@ from apps.taxonomy.models import (
     CaseStudy,
     ClientNeedsCategory,
     ClientNeedsSubcategory,
+    Domain,
     NursingSystem,
     Subtopic,
     Tag,
@@ -189,6 +190,14 @@ class Question(UUIDPKMixin, TimeStampedMixin, models.Model):
     difficulty = models.CharField(max_length=10, choices=Difficulty.choices)
 
     # --- Taxonomy tagging (apps.taxonomy) ---
+    # UWorld's "Subjects" facet (Adult Health, Pharmacology, ...) —
+    # orthogonal to nursing_system below (UWorld's "Systems" facet), not a
+    # parent/child of it. null=True/blank=True deliberately: this field was
+    # added after the first content batch was already imported, and those
+    # existing rows have no correct value to guess at (see seed_domains'
+    # docstring) — left for the content team/admin to backfill rather than
+    # auto-assigned.
+    domain = models.ForeignKey(Domain, on_delete=models.PROTECT, null=True, blank=True, related_name="questions")
     # on_delete=PROTECT (not CASCADE, unlike case_study above) is
     # deliberate here: it should be IMPOSSIBLE to delete a NursingSystem/
     # Topic/ClientNeedsCategory/etc. while any Question still references it
@@ -215,6 +224,17 @@ class Question(UUIDPKMixin, TimeStampedMixin, models.Model):
     )
 
     clinical_judgment_skill = models.CharField(max_length=25, choices=ClinicalJudgmentSkill.choices)
+    # Optional second CJ-process step a question also exercises (e.g. a
+    # question primarily tagged Take Action that also draws on Recognize
+    # Cues). null/blank because most questions only exercise one step —
+    # required content teams don't tag a secondary skill at all, and this
+    # must not force one. Added ahead of the content team's NGN batch
+    # (which does tag a secondary skill on several items) specifically so
+    # that data isn't dropped on import; Phase 2's clinical-judgment
+    # analytics (CLAUDE.md) is the eventual consumer.
+    clinical_judgment_skill_secondary = models.CharField(
+        max_length=25, choices=ClinicalJudgmentSkill.choices, null=True, blank=True
+    )
     cognitive_level = models.CharField(max_length=15, choices=CognitiveLevel.choices)
     # ManyToMany (not ForeignKey): a single question can carry several free-
     # form tags at once (e.g. both "pediatric" and "med-math"). blank=True
@@ -276,6 +296,11 @@ class Question(UUIDPKMixin, TimeStampedMixin, models.Model):
             # indexed individually by Django, but not as a pair, so a query
             # constraining both still had to intersect two indexes.
             models.Index(fields=["nursing_system", "topic"], name="question_taxonomy_idx"),
+            # The quiz-setup facet-counts endpoint (apps.quizzes.services)
+            # filters/groups by domain on every filter change — worth its
+            # own index alongside is_active the same way question_type does
+            # above.
+            models.Index(fields=["is_active", "domain"], name="question_domain_idx"),
         ]
 
     def __str__(self):
@@ -376,6 +401,10 @@ class MatrixCell(models.Model):
     row = models.ForeignKey(MatrixRow, on_delete=models.CASCADE, related_name="cells")
     column = models.ForeignKey(MatrixColumn, on_delete=models.CASCADE, related_name="cells")
     is_correct = models.BooleanField(default=False)
+    # Per-cell explanation, same role as AnswerChoice.rationale — why this
+    # row/column combination is (or isn't) correct. blank=True since older
+    # content may not have this filled in.
+    rationale = models.TextField(blank=True)
 
     class Meta:
         # Guarantees at most one cell per (row, column) pair — a grid can't
@@ -409,6 +438,7 @@ class BowTieOption(models.Model):
     option_text = models.TextField()
     is_correct = models.BooleanField(default=False)
     display_order = models.IntegerField(default=0)
+    rationale = models.TextField(blank=True)
 
     class Meta:
         # Grouped by section first (all Assessment options together, then
@@ -421,13 +451,21 @@ class BowTieOption(models.Model):
 
 
 class ClozeBlank(models.Model):
-    """blank_key must match a {{token}} placeholder in the parent Question.stem."""
+    """blank_key must match a [dropdown N] placeholder in the parent Question.stem."""
 
     # This is the mechanism that connects a specific blank to its position
     # within the stem text: the content author writes something like "The
-    # nurse should first assess the client's {{blank_1}}." in Question.stem,
-    # and blank_key="blank_1" here is what a renderer would match against
+    # nurse should first assess the client's [dropdown 1]." in Question.stem,
+    # and blank_key="dropdown 1" here is what a renderer would match against
     # that placeholder to know where to insert a dropdown.
+    #
+    # Originally documented as a {{blank_1}}-style token — changed to
+    # [dropdown N] to match the content team's actual authoring convention
+    # (confirmed against their NGN Item Bank spreadsheet) rather than
+    # requiring them to write in a syntax nothing has ever actually used.
+    # blank_key is free text either way (no format enforced at the field
+    # level), so this is a documentation/convention change, not a schema
+    # change — no migration needed.
     question = models.ForeignKey(Question, on_delete=models.CASCADE, related_name="cloze_blanks")
     blank_key = models.CharField(max_length=50)
     display_order = models.IntegerField(default=0)
@@ -452,6 +490,7 @@ class ClozeOption(models.Model):
     blank = models.ForeignKey(ClozeBlank, on_delete=models.CASCADE, related_name="options")
     option_text = models.CharField(max_length=255)
     is_correct = models.BooleanField(default=False)
+    rationale = models.TextField(blank=True)
 
     # No display_order here (unlike most other option/choice models in this
     # file) — dropdown options are typically presented alphabetically or in
@@ -499,6 +538,7 @@ class DragDropItem(models.Model):
     # order), while correct_order is the answer key for where they should
     # end up.
     correct_order = models.IntegerField(null=True, blank=True)
+    rationale = models.TextField(blank=True)
 
     class Meta:
         ordering = ["display_order"]
@@ -525,6 +565,7 @@ class HotSpotTarget(models.Model):
     target_text = models.CharField(max_length=255)
     is_correct = models.BooleanField(default=False)
     display_order = models.IntegerField(default=0)
+    rationale = models.TextField(blank=True)
 
     class Meta:
         ordering = ["display_order"]

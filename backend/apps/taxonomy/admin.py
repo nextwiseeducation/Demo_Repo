@@ -4,6 +4,7 @@ from .models import (
     CaseStudy,
     ClientNeedsCategory,
     ClientNeedsSubcategory,
+    Domain,
     NursingSystem,
     Subtopic,
     Tag,
@@ -20,6 +21,12 @@ from .models import (
 
 @admin.register(NursingSystem)
 class NursingSystemAdmin(admin.ModelAdmin):
+    list_display = ("name",)
+    search_fields = ("name",)
+
+
+@admin.register(Domain)
+class DomainAdmin(admin.ModelAdmin):
     list_display = ("name",)
     search_fields = ("name",)
 
@@ -70,5 +77,5 @@ class CaseStudyAdmin(admin.ModelAdmin):
     # left out of list_display — showing a full TextField in a list-view
     # column would make the list unreadable; the admin's detail/edit page is
     # still where the full text is viewed/edited.
-    list_display = ("title",)
-    search_fields = ("title",)
+    list_display = ("title", "external_id")
+    search_fields = ("title", "external_id")

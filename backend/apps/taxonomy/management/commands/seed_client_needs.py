@@ -3,6 +3,19 @@ from django.db import transaction
 
 from apps.taxonomy.models import ClientNeedsCategory, ClientNeedsSubcategory, ExamType
 
+# The exact wording UWorld's own live product uses for this subcategory,
+# independently confirmed by the client's own Excel content batch — the
+# name this command used to seed ("Safety and Infection Control") was
+# simply wrong. RENAMED_SUBCATEGORIES below fixes it in place on an
+# existing database rather than via the RN_CLIENT_NEEDS dict alone, so
+# Question rows already pointing at the old name keep their FK intact
+# instead of becoming orphaned by a get_or_create that only ever creates.
+RENAMED_SUBCATEGORIES = {
+    ("Safe and Effective Care Environment", "Safety and Infection Control"): (
+        "Safety and Infection Prevention and Control"
+    ),
+}
+
 # The official NCSBN NCLEX-RN Client Needs structure.
 #
 # Hardcoded here — unlike NursingSystem/Topic/Subtopic, which are this
@@ -15,22 +28,22 @@ from apps.taxonomy.models import ClientNeedsCategory, ClientNeedsSubcategory, Ex
 # a migration would freeze the list into migration history, and NCSBN does
 # revise the test plan periodically. This can simply be edited and re-run.
 #
-# Note which categories have NO subcategories. That is not an omission —
-# NCSBN genuinely does not subdivide Health Promotion and Maintenance or
-# Psychosocial Integrity. It is also the open question behind the
-# NEEDS_REVIEW rows in the content file (CLAUDE.md, "Questions Pending from
-# Content Team" #4): Question.nclex_client_needs_subcategory is currently a
-# required FK, so a question in one of these two categories has nothing
-# valid to point at. Resolving that — either by making the field nullable or
-# by agreeing a "General" subcategory with the client — is what unblocks
-# those rows.
+# Health Promotion and Maintenance and Psychosocial Integrity each get
+# THEMSELVES as their own single subcategory below, rather than an empty
+# list. NCSBN genuinely does not subdivide either category further, but
+# Question.nclex_client_needs_subcategory is a required FK — this was the
+# open NEEDS_REVIEW question from the first content batch (CLAUDE.md,
+# "Questions Pending from Content Team" #4), and it's now resolved: UWorld's
+# own live product (and the client's own Excel content batch) both use
+# exactly this self-naming convention as their filterable "subcategory" for
+# these two categories, confirmed independently of each other.
 RN_CLIENT_NEEDS = {
     "Safe and Effective Care Environment": [
         "Management of Care",
-        "Safety and Infection Control",
+        "Safety and Infection Prevention and Control",
     ],
-    "Health Promotion and Maintenance": [],
-    "Psychosocial Integrity": [],
+    "Health Promotion and Maintenance": ["Health Promotion and Maintenance"],
+    "Psychosocial Integrity": ["Psychosocial Integrity"],
     "Physiological Integrity": [
         "Basic Care and Comfort",
         "Pharmacological and Parenteral Therapies",
@@ -65,11 +78,26 @@ class Command(BaseCommand):
     def handle(self, *args, **options):
         created_categories = 0
         created_subcategories = 0
+        renamed_subcategories = 0
 
         # One transaction for the whole seed: a partially-seeded taxonomy is
         # worse than an unseeded one, because the importer would then accept
         # some rows and reject others for no reason an editor could see.
         with transaction.atomic():
+            # Rename existing rows BEFORE the get_or_create loop below, so a
+            # database that already has the old "Safety and Infection
+            # Control" row gets renamed in place (preserving every Question
+            # FK pointing at it) rather than the loop creating a second,
+            # differently-named row alongside it. filter().update() is a
+            # no-op (0 rows matched) once already renamed, so this stays
+            # safe to re-run on every deploy like the rest of the command.
+            for (category_name, old_name), new_name in RENAMED_SUBCATEGORIES.items():
+                renamed_subcategories += ClientNeedsSubcategory.objects.filter(
+                    name=old_name,
+                    category__name=category_name,
+                    category__exam_type=ExamType.RN,
+                ).update(name=new_name)
+
             for category_name, subcategory_names in RN_CLIENT_NEEDS.items():
                 category, made = ClientNeedsCategory.objects.get_or_create(
                     name=category_name, exam_type=ExamType.RN
@@ -84,6 +112,8 @@ class Command(BaseCommand):
                     if made:
                         created_subcategories += 1
 
+        if renamed_subcategories:
+            self.stdout.write(self.style.SUCCESS(f"Renamed {renamed_subcategories} subcategory(ies)."))
         if created_categories or created_subcategories:
             self.stdout.write(
                 self.style.SUCCESS(
@@ -91,5 +121,5 @@ class Command(BaseCommand):
                     f"{created_subcategories} subcategory(ies)."
                 )
             )
-        else:
+        if not (renamed_subcategories or created_categories or created_subcategories):
             self.stdout.write("Client Needs taxonomy already seeded — nothing to do.")

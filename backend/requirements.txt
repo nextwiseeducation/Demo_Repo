@@ -5,5 +5,6 @@ django-environ==0.14.0
 django-anymail[resend]==15.1
 django-cors-headers==4.9.0
 psycopg[binary]==3.3.4
+openpyxl==3.1.5
 gunicorn==26.1.0
 whitenoise==6.12.0

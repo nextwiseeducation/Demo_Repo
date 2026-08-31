@@ -30,6 +30,22 @@ class QuestionListSerializer(serializers.ModelSerializer):
     nclex_client_needs_category = serializers.CharField(
         source="nclex_client_needs_category.name", read_only=True
     )
+    # Added alongside the id fields below for the quiz-setup facet UI (built
+    # against apps.quizzes) — it filters/groups by these taxonomy rows'
+    # *ids*, not display names, so the plain name-only fields above aren't
+    # enough on their own. domain is nullable (see Question.domain's own
+    # comment), hence source="domain.name" with allow_null implied by
+    # required=False rather than a plain CharField, which would error on
+    # the None case.
+    domain = serializers.CharField(source="domain.name", read_only=True, allow_null=True, default=None)
+    domain_id = serializers.IntegerField(source="domain.id", read_only=True, allow_null=True, default=None)
+    nursing_system_id = serializers.IntegerField(source="nursing_system.id", read_only=True)
+    nclex_client_needs_subcategory = serializers.CharField(
+        source="nclex_client_needs_subcategory.name", read_only=True
+    )
+    nclex_client_needs_subcategory_id = serializers.IntegerField(
+        source="nclex_client_needs_subcategory.id", read_only=True
+    )
     answer_choices = PublicAnswerChoiceSerializer(many=True, read_only=True)
 
     class Meta:
@@ -40,9 +56,14 @@ class QuestionListSerializer(serializers.ModelSerializer):
             "stem",
             "clinical_scenario",
             "difficulty",
+            "domain",
+            "domain_id",
             "nursing_system",
+            "nursing_system_id",
             "topic",
             "nclex_client_needs_category",
+            "nclex_client_needs_subcategory",
+            "nclex_client_needs_subcategory_id",
             "clinical_judgment_skill",
             "answer_choices",
             "key_takeaway",

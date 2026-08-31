@@ -23,11 +23,15 @@ from apps.taxonomy.models import (
 QUESTIONS_FILE = settings.BASE_DIR / "Question JSON" / "questions.json"
 
 # A row whose nclex_client_needs_subcategory is this literal string is
-# skipped rather than imported with a placeholder — see CLAUDE.md's
-# "Questions Pending from Content Team" #4: two of the four official NCSBN
-# Client Needs categories (Health Promotion and Maintenance, Psychosocial
-# Integrity) have no real subcategories, and that policy question is not
-# resolved yet.
+# skipped rather than imported with a placeholder. Originally this covered
+# an unresolved policy question (CLAUDE.md's "Questions Pending from
+# Content Team" #4: two of the four official NCSBN Client Needs categories,
+# Health Promotion and Maintenance and Psychosocial Integrity, have no real
+# subcategories) — that's now resolved (see seed_client_needs.py: each of
+# those two categories is seeded with itself as its own subcategory,
+# confirmed against both UWorld's live product and the client's own Excel
+# batch). The sentinel/skip mechanism itself stays, since a row can still
+# legitimately arrive with a subcategory nobody has assigned yet.
 NEEDS_REVIEW_SENTINEL = "NEEDS_REVIEW"
 
 

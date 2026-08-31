@@ -335,6 +335,11 @@ REST_FRAMEWORK = {
         # one account can harvest it (see QuestionSubmitView's docstring).
         # Set well above what a real quiz-taker generates.
         "question_submit": "300/hour",
+        # The one endpoint plausibly hit on every filter checkbox click on
+        # the quiz-setup page (debounced client-side, but still far more
+        # frequent than normal authenticated-CRUD traffic) — set high enough
+        # that a real student rapidly toggling filters never hits it.
+        "quiz_facet_counts": "120/min",
         # Feedback/issue reports accept free text, so an unbounded rate is a
         # cheap way to fill the database.
         "feedback": "20/hour",

@@ -39,6 +39,24 @@ class NursingSystem(models.Model):
         return self.name
 
 
+class Domain(models.Model):
+    """
+    UWorld's "Subjects" facet (Adult Health, Pharmacology, ...) — a broad
+    curriculum-area grouping, independent of NursingSystem (body-system/
+    skill grouping) rather than a parent of it. Same status as
+    NursingSystem: this project's own invented taxonomy, not an NCSBN
+    standard, admin-managed, seeded via seed_domains.
+    """
+
+    name = models.CharField(max_length=100, unique=True)
+
+    class Meta:
+        ordering = ["name"]
+
+    def __str__(self):
+        return self.name
+
+
 class Topic(models.Model):
     # on_delete=CASCADE: deleting a NursingSystem deletes all its Topics too
     # (and transitively, per Subtopic below, their Subtopics) — acceptable
@@ -177,6 +195,14 @@ class Tag(models.Model):
 class CaseStudy(models.Model):
     """Shared clinical scenario linking a set of sequenced NGN Case Study questions."""
 
+    # Same reasoning as Question.external_id (apps/questions/models.py):
+    # the content team's own stable id for a case (e.g. "CASE-001"), and the
+    # natural key an import can match on for idempotent re-runs. Without it,
+    # re-running a case-study importer against the same source file would
+    # create a duplicate CaseStudy row every time, since title alone isn't
+    # enforced unique. null/blank because hand-authored cases (via the
+    # admin) have no upstream id.
+    external_id = models.CharField(max_length=64, unique=True, null=True, blank=True)
     title = models.CharField(max_length=255)
     # TextField (not CharField): the scenario is a multi-paragraph clinical
     # vignette, not a short label — no practical length cap makes sense.

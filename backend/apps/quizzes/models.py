@@ -25,11 +25,17 @@ class QuizSession(UUIDPKMixin, models.Model):
     # The actual set of questions in this quiz — a ManyToMany rather than a
     # fixed-size set of ForeignKeys, since a quiz can contain any number of
     # questions decided at creation time by the student's filter choices.
-    questions = models.ManyToManyField(Question, related_name="quiz_sessions")
+    # through=QuizSessionQuestion (below) rather than a bare M2M: a plain
+    # M2M has no guaranteed retrieval order (Django would fall back to
+    # Question.Meta.ordering, i.e. -created_at, the same order for every
+    # session regardless of what was actually drawn), which makes
+    # current_question_index below meaningless without it.
+    questions = models.ManyToManyField(Question, through="QuizSessionQuestion", related_name="quiz_sessions")
     # Tracks progress through `questions` (e.g. index 3 = currently on the
     # 4th question) — what makes "resume mid-quiz" possible (CLAUDE.md
     # Milestone 3 requirement) without recomputing progress from
-    # StudentResponseLog each time.
+    # StudentResponseLog each time. Indexes into the through model's
+    # `position` ordering, not raw M2M iteration order.
     current_question_index = models.IntegerField(default=0)
     is_complete = models.BooleanField(default=False)
     started_at = models.DateTimeField(auto_now_add=True)
@@ -54,6 +60,32 @@ class QuizSession(UUIDPKMixin, models.Model):
 
     def __str__(self):
         return f"QuizSession({self.student}, {self.started_at:%Y-%m-%d})"
+
+
+class QuizSessionQuestion(models.Model):
+    """
+    Through-model for QuizSession.questions — exists purely to give the M2M
+    a persisted, deterministic order (`position`), which is what
+    QuizSession.current_question_index actually indexes into. No
+    UUIDPKMixin/TimeStampedMixin — never referenced by anything else, same
+    reasoning as the NGN stub models in apps.questions.models.
+    """
+
+    quiz_session = models.ForeignKey(QuizSession, on_delete=models.CASCADE, related_name="session_questions")
+    question = models.ForeignKey(Question, on_delete=models.CASCADE, related_name="session_questions")
+    position = models.IntegerField()
+
+    class Meta:
+        ordering = ["position"]
+        constraints = [
+            # A session can't have two questions claiming the same slot...
+            models.UniqueConstraint(fields=["quiz_session", "position"], name="unique_position_per_session"),
+            # ...nor the same question appearing twice in one session.
+            models.UniqueConstraint(fields=["quiz_session", "question"], name="unique_question_per_session"),
+        ]
+
+    def __str__(self):
+        return f"{self.quiz_session_id}[{self.position}] -> {self.question_id}"
 
 
 class StudentResponseLog(UUIDPKMixin, models.Model):
@@ -109,3 +141,28 @@ class StudentResponseLog(UUIDPKMixin, models.Model):
         # to render in bulk admin list views, where fetching+truncating
         # every related Question's stem for every row would be wasteful.
         return f"{self.student} -> {self.question_id} ({'correct' if self.is_correct else 'incorrect'})"
+
+
+class Bookmark(UUIDPKMixin, models.Model):
+    """
+    A student's "Mark for review" flag on a Question (UWorld's "Marked"
+    Question Mode bucket) — independent of any specific QuizSession, and
+    independent of correct/incorrect: a question stays marked across
+    attempts until explicitly un-marked, and can be simultaneously
+    Incorrect AND Marked. UUIDPKMixin only (no TimeStampedMixin) — one
+    creation timestamp is all this needs, same reasoning as QuizSession's
+    own started_at/completed_at instead of a generic updated_at.
+    """
+
+    student = models.ForeignKey(settings.AUTH_USER_MODEL, on_delete=models.CASCADE, related_name="bookmarks")
+    question = models.ForeignKey(Question, on_delete=models.CASCADE, related_name="bookmarks")
+    created_at = models.DateTimeField(auto_now_add=True)
+
+    class Meta:
+        ordering = ["-created_at"]
+        constraints = [
+            models.UniqueConstraint(fields=["student", "question"], name="unique_bookmark_per_student_question")
+        ]
+
+    def __str__(self):
+        return f"{self.student} marked {self.question_id}"

@@ -1,7 +1,9 @@
 import { useMutation } from "@tanstack/react-query";
+import { Bookmark, BookmarkCheck } from "lucide-react";
 import { useEffect, useReducer, useRef } from "react";
 import { Navigate, useLocation, useNavigate } from "react-router-dom";
 
+import { Button } from "@/components/ui/button";
 import { MCQChoiceList } from "@/features/quiz/components/MCQChoiceList";
 import { QuestionCard } from "@/features/quiz/components/QuestionCard";
 import { QuestionFeedbackBar } from "@/features/quiz/components/QuestionFeedbackBar";
@@ -9,32 +11,34 @@ import { QuizProgressBar } from "@/features/quiz/components/QuizProgressBar";
 import { SATAChoiceList } from "@/features/quiz/components/SATAChoiceList";
 import { UnsupportedQuestionTypeNotice } from "@/features/quiz/components/UnsupportedQuestionTypeNotice";
 import { createInitialState, quizSessionReducer } from "@/features/quiz/quizSessionReducer";
-import * as questionsApi from "@/lib/api/questions";
+import * as quizzesApi from "@/lib/api/quizzes";
 import { ROUTES } from "@/lib/constants";
-import type { Question } from "@/types/question";
-import type { QuestionResponse, QuizFilterConfig } from "@/types/quiz";
+import type { QuestionResponse, QuizSession as QuizSessionData } from "@/types/quiz";
 
 interface LocationState {
-  questions: Question[];
-  filterConfig: QuizFilterConfig;
+  session: QuizSessionData;
 }
 
 export function QuizSessionPage() {
   const location = useLocation();
   const state = location.state as LocationState | null;
 
-  // Session config lives only in router state (nothing is persisted for
-  // this mock feature) — a direct refresh/link here has nothing to resume.
-  if (!state?.questions?.length) {
+  // The session itself now lives server-side (a real QuizSession +
+  // StudentResponseLog rows, written as each answer is submitted below) —
+  // what's carried here is just the already-created session's id +
+  // ordered questions, handed off from QuizSetupPage's "Generate Quiz".
+  // There's no GET-by-id endpoint yet, so a direct refresh/link still has
+  // nothing to resume from and bounces to setup, same as before.
+  if (!state?.session?.questions?.length) {
     return <Navigate to={ROUTES.quizSetup} replace />;
   }
 
-  return <QuizSessionInner questions={state.questions} filterConfig={state.filterConfig} />;
+  return <QuizSessionInner quizSession={state.session} />;
 }
 
-function QuizSessionInner({ questions, filterConfig }: { questions: Question[]; filterConfig: QuizFilterConfig }) {
+function QuizSessionInner({ quizSession }: { quizSession: QuizSessionData }) {
   const navigate = useNavigate();
-  const [session, dispatch] = useReducer(quizSessionReducer, createInitialState(questions));
+  const [session, dispatch] = useReducer(quizSessionReducer, createInitialState(quizSession.questions));
   // Wall-clock start of this session — diffed at finish to report total
   // time spent to the results page. A ref (not state) since it's write-once
   // and reading it never needs to trigger a re-render.
@@ -55,6 +59,11 @@ function QuizSessionInner({ questions, filterConfig }: { questions: Question[]; 
   const selectedIds = answer?.selectedChoiceIds ?? [];
   const isLastQuestion = session.currentIndex === session.questions.length - 1;
   const isSupported = question.question_type === "MCQ" || question.question_type === "SATA";
+  const isMarked = session.markedIds.has(question.id);
+  // Test Mode's Tutor toggle (quiz-setup page) — when off, the correct
+  // answer/rationale bar stays hidden after each question, matching
+  // UWorld's actual Tutor-vs-not distinction.
+  const showFeedbackBar = quizSession.filter_config.is_tutor_mode;
 
   useEffect(() => {
     questionStartedAtRef.current = Date.now();
@@ -62,8 +71,17 @@ function QuizSessionInner({ questions, filterConfig }: { questions: Question[]; 
 
   const submitMutation = useMutation({
     mutationFn: ({ questionId, selectedChoiceIds }: { questionId: string; selectedChoiceIds: string[] }) =>
-      questionsApi.submitAnswer(questionId, selectedChoiceIds),
+      quizzesApi.submitSessionAnswer(quizSession.id, {
+        questionId,
+        selectedChoiceIds,
+        timeTakenSeconds: questionTimeSpentRef.current,
+      }),
     onSuccess: (result, { questionId }) => dispatch({ type: "SUBMIT_RESULT", questionId, result }),
+  });
+
+  const bookmarkMutation = useMutation({
+    mutationFn: () => quizzesApi.toggleBookmark(question.id),
+    onSuccess: (result) => dispatch({ type: "MARK_TOGGLED", questionId: question.id, marked: result.marked }),
   });
 
   // Running accuracy across every question submitted so far this session
@@ -90,7 +108,7 @@ function QuizSessionInner({ questions, filterConfig }: { questions: Question[]; 
       });
       const totalTimeSeconds = Math.round((Date.now() - startedAtRef.current) / 1000);
       navigate(ROUTES.quizResults, {
-        state: { questions: session.questions, responses, filterConfig, totalTimeSeconds },
+        state: { questions: session.questions, responses, totalTimeSeconds },
       });
       return;
     }
@@ -99,7 +117,19 @@ function QuizSessionInner({ questions, filterConfig }: { questions: Question[]; 
 
   return (
     <div className="page">
-      <QuizProgressBar currentIndex={session.currentIndex} total={session.questions.length} question={question} />
+      <div className="flex items-center justify-between gap-3">
+        <QuizProgressBar currentIndex={session.currentIndex} total={session.questions.length} question={question} />
+        <Button
+          type="button"
+          variant="ghost"
+          size="sm"
+          disabled={bookmarkMutation.isPending}
+          onClick={() => bookmarkMutation.mutate()}
+        >
+          {isMarked ? <BookmarkCheck className="h-4 w-4 text-primary" /> : <Bookmark className="h-4 w-4" />}
+          {isMarked ? "Marked" : "Mark for review"}
+        </Button>
+      </div>
 
       {isSupported ? (
         <QuestionCard question={question} questionNumber={session.currentIndex + 1}>
@@ -123,7 +153,7 @@ function QuizSessionInner({ questions, filterConfig }: { questions: Question[]; 
         <UnsupportedQuestionTypeNotice questionType={question.question_type} onSkip={goNextOrFinish} />
       )}
 
-      {isSupported && submitted && (
+      {isSupported && submitted && showFeedbackBar && (
         <QuestionFeedbackBar
           isCorrect={answer?.isCorrect ?? false}
           accuracyPercent={accuracyPercent}

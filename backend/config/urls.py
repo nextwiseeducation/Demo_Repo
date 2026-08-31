@@ -19,9 +19,12 @@ urlpatterns = [
     # Minimal read + grade endpoints so the quiz UI can use real content;
     # full filtering/search is still Milestone 2/3 scope.
     path("api/questions/", include("apps.questions.urls")),
-    # apps.taxonomy / apps.quizzes have no urls.py yet — their models are
-    # complete (Milestone 1 scope) but the REST endpoints to read/write them
-    # are Milestone 2/3 scope, so nothing is wired here.
+    # Real quiz-session creation/answering, live facet counts, bookmarks.
+    path("api/quizzes/", include("apps.quizzes.urls")),
+    # apps.taxonomy has no urls.py of its own yet — every taxonomy value the
+    # frontend needs (Domain/NursingSystem/ClientNeedsSubcategory ids+names)
+    # is exposed via apps.quizzes' facet-counts endpoint instead, so a
+    # separate read API for these models isn't needed yet.
 ]
 
 if settings.DEBUG:

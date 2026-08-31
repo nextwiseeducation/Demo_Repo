@@ -3,15 +3,14 @@ import { Link } from "react-router-dom";
 import { Card, CardContent } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
 import { ROUTES } from "@/lib/constants";
-import type { QuizFilterConfig } from "@/types/quiz";
 
 interface QuizResultsSummaryProps {
   correctCount: number;
   totalCount: number;
   /** Undefined for a link built before totalTimeSeconds was forwarded — the row is simply omitted. */
   totalTimeSeconds?: number;
-  /** Undefined for a link built before filterConfig was forwarded — falls back to "Mixed Practice". */
-  filterConfig?: QuizFilterConfig;
+  /** Computed by QuizResultsPage from the actual questions in this quiz — see its own comment for how. */
+  topicLabel: string;
   incorrectCount: number;
   onReviewIncorrect: () => void;
 }
@@ -33,12 +32,11 @@ export function QuizResultsSummary({
   correctCount,
   totalCount,
   totalTimeSeconds,
-  filterConfig,
+  topicLabel,
   incorrectCount,
   onReviewIncorrect,
 }: QuizResultsSummaryProps) {
   const percent = totalCount > 0 ? Math.round((correctCount / totalCount) * 100) : 0;
-  const topicLabel = filterConfig?.nursing_system || "Mixed Practice";
 
   return (
     <Card>

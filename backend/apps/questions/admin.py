@@ -31,8 +31,8 @@ class QuestionAdmin(admin.ModelAdmin):
     # "__str__" as a list_display column reuses Question.__str__ (the
     # "[TYPE] truncated stem" format) as the row label, instead of showing
     # the raw UUID pk.
-    list_display = ("__str__", "question_type", "difficulty", "nursing_system", "topic", "is_active")
-    list_filter = ("question_type", "difficulty", "nursing_system", "is_active")
+    list_display = ("__str__", "question_type", "difficulty", "domain", "nursing_system", "topic", "is_active")
+    list_filter = ("question_type", "difficulty", "domain", "nursing_system", "is_active")
     # Lets an editor free-text search question stems from the admin's
     # search box — the only field indexed for search here, since stem is
     # the field most likely to be searched by content ("find the question

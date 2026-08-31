@@ -54,9 +54,15 @@ export interface Question {
   stem: string;
   clinical_scenario: string | null;
   difficulty: Difficulty;
+  /** UWorld's "Subjects" facet — null until the content team backfills it (see backend Question.domain's own comment). */
+  domain: string | null;
+  domain_id: number | null;
   nursing_system: string;
+  nursing_system_id: number;
   topic: string;
   nclex_client_needs_category: string;
+  nclex_client_needs_subcategory: string;
+  nclex_client_needs_subcategory_id: number;
   clinical_judgment_skill: string;
   answer_choices: AnswerChoice[];
   /** Short "big idea" the student should walk away with. Optional — most questions won't have one yet. */

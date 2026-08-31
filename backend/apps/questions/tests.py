@@ -531,3 +531,199 @@ class PaginationContractTests(APITestCase):
         # every single page load.
         data = self.client.get(reverse("question-list"), {"page": 2}).data
         self.assertIsNone(data["next"])
+
+
+# --- import_ngn_item_bank -----------------------------------------------
+
+import tempfile
+
+import openpyxl
+from django.core.management import call_command
+
+from apps.taxonomy.models import CaseStudy, Domain
+
+from .models import MatrixCell
+
+
+def _write_sheet(wb, name, headers, rows):
+    ws = wb.create_sheet(name)
+    ws.append(headers)
+    for row in rows:
+        ws.append([row.get(h) for h in headers])
+
+
+def _build_workbook():
+    """
+    A small, self-contained fixture exercising one question of every type
+    plus a 2-item case study — not the real client file, just enough to
+    verify import_ngn_item_bank's actual behavior end to end.
+    """
+    wb = openpyxl.Workbook()
+    wb.remove(wb.active)
+
+    im_headers = [
+        "Question_ID", "Item_Type", "Domain", "Body_System", "Topic", "Subtopic", "Difficulty",
+        "Cognitive_Level", "Client_Needs_Category", "Client_Needs_Subcategory",
+        "Clinical_Judgment_Skill_Primary", "Clinical_Judgment_Skill_Secondary", "Tags", "Scenario", "Stem",
+        "Clinical_Tip", "Reference_Key",
+    ]
+    common = dict(
+        Domain="Adult Health", Body_System="Cardiovascular", Topic="Heart Failure", Subtopic=None,
+        Difficulty="Moderate", Cognitive_Level="Apply", Client_Needs_Category="Physiological Integrity",
+        Client_Needs_Subcategory="Reduction of Risk Potential", Clinical_Judgment_Skill_Primary="Take Action",
+        Clinical_Judgment_Skill_Secondary=None, Tags="test, fixture", Scenario=None, Clinical_Tip="Tip.",
+        Reference_Key=None,
+    )
+    im_rows = [
+        dict(Question_ID="MCQ-1", Item_Type="MCQ", Stem="Which is correct?", **common),
+        dict(Question_ID="MTX-1", Item_Type="Matrix/Grid", Stem="Expected or unexpected?", **common),
+        dict(Question_ID="BT-1", Item_Type="Bow-Tie", Stem="Complete the bow-tie.", **common),
+        dict(Question_ID="CLZ-1", Item_Type="Cloze", Stem="The nurse should [dropdown 1].", **common),
+        dict(
+            Question_ID="EHS-1", Item_Type="Hot Spot",
+            Stem="Highlight the finding: client is diaphoretic and pale.", **{**common, "Scenario": None},
+        ),
+        dict(Question_ID="DND-1", Item_Type="Drag-and-Drop (Sequencing)", Stem="Order the steps.", **common),
+        dict(Question_ID="CASE-1", Item_Type="NGN Case Study", Stem="See NGN_Components", **common),
+    ]
+    _write_sheet(wb, "Item_Master", im_headers, im_rows)
+
+    ao_headers = ["Question_ID", "Option_ID", "Option_Text", "Is_Correct", "Rationale"]
+    ao_rows = [
+        dict(Question_ID="MCQ-1", Option_ID="A", Option_Text="Right", Is_Correct="TRUE", Rationale="Because."),
+        dict(Question_ID="MCQ-1", Option_ID="B", Option_Text="Wrong", Is_Correct="FALSE", Rationale="Not this."),
+        dict(Question_ID="MTX-1", Option_ID="Finding A", Option_Text="Expected", Is_Correct="TRUE", Rationale="Normal."),
+        dict(Question_ID="MTX-1", Option_ID="Finding B", Option_Text="Unexpected", Is_Correct="TRUE", Rationale="Not normal."),
+        dict(Question_ID="BT-1", Option_ID="Action 1", Option_Text="Do X", Is_Correct="TRUE", Rationale="X helps."),
+        dict(Question_ID="BT-1", Option_ID="Action 2", Option_Text="Do Y", Is_Correct="FALSE", Rationale="Y doesn't."),
+        dict(Question_ID="BT-1", Option_ID="Condition A", Option_Text="Condition X", Is_Correct="TRUE", Rationale="Matches."),
+        dict(Question_ID="BT-1", Option_ID="Assessment i", Option_Text="Vitals", Is_Correct="TRUE", Rationale="Watch vitals."),
+        dict(Question_ID="CLZ-1", Option_ID="Option 1", Option_Text="call the provider", Is_Correct="TRUE", Rationale="Right."),
+        dict(Question_ID="CLZ-1", Option_ID="Option 2", Option_Text="do nothing", Is_Correct="FALSE", Rationale="Wrong."),
+        dict(Question_ID="EHS-1", Option_ID="Highlight 1", Option_Text="diaphoretic and pale", Is_Correct="TRUE", Rationale="Concerning."),
+        dict(Question_ID="DND-1", Option_ID="Step 1", Option_Text="First", Is_Correct="TRUE", Rationale="Goes first."),
+        dict(Question_ID="DND-1", Option_ID="Step 2", Option_Text="Second", Is_Correct="TRUE", Rationale="Goes second."),
+    ]
+    _write_sheet(wb, "Answer_Options", ao_headers, ao_rows)
+
+    nc_headers = ["Case_ID", "Domain", "Body_System", "Topic/Subtopic", "Overall_Difficulty", "Reference_Key",
+                  "Case_Presentation_Hour0"]
+    _write_sheet(wb, "NGN_Cases", nc_headers, [
+        dict(Case_ID="CASE-1", Domain="Adult Health", Body_System="Cardiovascular", **{"Topic/Subtopic": "Heart Failure"},
+             Overall_Difficulty="Moderate", Reference_Key=None, Case_Presentation_Hour0="Hour 0 presentation."),
+    ])
+
+    ncomp_headers = ["Case_ID", "Item_No", "Clinical_Judgment_Step", "Item_Type", "Item_Subtype_Detail",
+                      "Difficulty", "Cognitive_Level", "Domain", "Body_System", "Topic", "Subtopic",
+                      "Client_Needs_Category", "Client_Needs_Subcategory", "Reference_Key", "Updated_Exhibit",
+                      "Stem", "Correct_Answer", "Rationale", "Clinical_Tip"]
+    _write_sheet(wb, "NGN_Components", ncomp_headers, [
+        dict(Case_ID="CASE-1", Item_No=1, Clinical_Judgment_Step="Recognize Cues", Item_Type="MCQ",
+             Item_Subtype_Detail=None, Difficulty="Moderate", Cognitive_Level="Analyze", Domain=None,
+             Body_System=None, Topic=None, Subtopic=None, Client_Needs_Category="Physiological Integrity",
+             Client_Needs_Subcategory="Reduction of Risk Potential", Reference_Key=None,
+             Updated_Exhibit="Hour 0", Stem="A) foo B) bar", Correct_Answer="A", Rationale="Because A.",
+             Clinical_Tip=None),
+        dict(Case_ID="CASE-1", Item_No=2, Clinical_Judgment_Step="Take Action", Item_Type="SATA",
+             Item_Subtype_Detail=None, Difficulty="Moderate", Cognitive_Level="Apply", Domain=None,
+             Body_System=None, Topic=None, Subtopic=None, Client_Needs_Category="Physiological Integrity",
+             Client_Needs_Subcategory="Reduction of Risk Potential", Reference_Key=None,
+             Updated_Exhibit="Hour 1", Stem="A) foo B) bar C) baz", Correct_Answer="A, C", Rationale="Because.",
+             Clinical_Tip=None),
+    ])
+
+    _write_sheet(wb, "References", ["Reference_Key", "Full_Citation"], [])
+
+    return wb
+
+
+class ImportNgnItemBankTests(TestCase):
+    def setUp(self):
+        nursing_system, _ = NursingSystem.objects.get_or_create(name="Cardiovascular")
+        Topic.objects.get_or_create(nursing_system=nursing_system, name="Heart Failure")
+        Domain.objects.get_or_create(name="Adult Health")
+        category, _ = ClientNeedsCategory.objects.get_or_create(name="Physiological Integrity")
+        ClientNeedsSubcategory.objects.get_or_create(category=category, name="Reduction of Risk Potential")
+
+    def _run(self, wb, **kwargs):
+        with tempfile.NamedTemporaryFile(suffix=".xlsx") as f:
+            wb.save(f.name)
+            call_command("import_ngn_item_bank", file=f.name, **kwargs)
+
+    def test_imports_one_of_every_type_plus_a_case_study(self):
+        self._run(_build_workbook())
+
+        self.assertEqual(Question.objects.filter(external_id="MCQ-1").count(), 1)
+        self.assertEqual(Question.objects.filter(external_id="MTX-1").count(), 1)
+        self.assertEqual(Question.objects.filter(external_id="BT-1").count(), 1)
+        self.assertEqual(Question.objects.filter(external_id="CLZ-1").count(), 1)
+        self.assertEqual(Question.objects.filter(external_id="EHS-1").count(), 1)
+        self.assertEqual(Question.objects.filter(external_id="DND-1").count(), 1)
+        # The case-study summary row in Item_Master must NOT become its own
+        # Question — only its 2 linked NGN_Components items should.
+        self.assertFalse(Question.objects.filter(external_id="CASE-1").exists())
+        self.assertEqual(Question.objects.filter(external_id__startswith="CASE-1-item-").count(), 2)
+
+    def test_matrix_synthesizes_the_false_cell_for_every_row(self):
+        self._run(_build_workbook())
+        question = Question.objects.get(external_id="MTX-1")
+        # 2 rows x 2 columns = 4 cells, even though the sheet only stated
+        # ONE correct column per row — the other cell must be synthesized.
+        self.assertEqual(MatrixCell.objects.filter(row__question=question).count(), 4)
+        correct = MatrixCell.objects.filter(row__question=question, is_correct=True)
+        self.assertEqual(correct.count(), 2)
+
+    def test_bowtie_splits_options_into_the_right_sections(self):
+        self._run(_build_workbook())
+        question = Question.objects.get(external_id="BT-1")
+        sections = {o.section for o in question.bowtie_options.all()}
+        self.assertEqual(sections, {"ACTION", "CONDITION", "ASSESSMENT"})
+
+    def test_case_study_items_get_correct_sequence_and_ngn_type(self):
+        self._run(_build_workbook())
+        case = CaseStudy.objects.get(external_id="CASE-1")
+        items = list(Question.objects.filter(case_study=case).order_by("case_study_sequence"))
+        self.assertEqual([i.case_study_sequence for i in items], [1, 2])
+        self.assertEqual([i.question_type for i in items], ["NGN_CASE", "NGN_CASE"])
+        self.assertEqual([i.ngn_type for i in items], ["MCQ", "SATA"])
+        # Item 1 has no Domain/Body_System override in the fixture — must
+        # inherit from the NGN_Cases row rather than being left null.
+        self.assertEqual(items[0].domain.name, "Adult Health")
+        self.assertEqual(items[0].nursing_system.name, "Cardiovascular")
+
+    def test_hotspot_target_not_found_in_stem_is_rejected_not_imported(self):
+        # Regression test for the exact bug caught while building this
+        # command: EHS-002's target text didn't match its own passage
+        # verbatim. RowError is caught per-row inside handle() and reported
+        # to stdout rather than propagating — so the observable behavior a
+        # caller can assert on is "the row was never created", not an
+        # exception reaching call_command.
+        wb = _build_workbook()
+        ws = wb["Answer_Options"]
+        for row in ws.iter_rows(min_row=2):
+            if row[0].value == "EHS-1":
+                row[2].value = "this text is not in the stem at all"
+
+        self._run(wb)
+        self.assertFalse(Question.objects.filter(external_id="EHS-1").exists())
+
+    def test_matrix_with_more_than_two_columns_is_rejected(self):
+        wb = _build_workbook()
+        ws = wb["Answer_Options"]
+        # Add a 3rd row with a 3rd distinct column label — over the
+        # importer's current 2-column-only support.
+        ws.append(["MTX-1", "Finding C", "Neither", "TRUE", "Ambiguous."])
+        self._run(wb)
+        self.assertFalse(Question.objects.filter(external_id="MTX-1").exists())
+
+    def test_rerunning_is_idempotent(self):
+        wb = _build_workbook()
+        self._run(wb)
+        count_before = Question.objects.count()
+        self._run(wb)
+        self.assertEqual(Question.objects.count(), count_before)
+
+    def test_dry_run_writes_nothing(self):
+        self._run(_build_workbook(), dry_run=True)
+        self.assertEqual(Question.objects.count(), 0)
+        self.assertEqual(CaseStudy.objects.count(), 0)
