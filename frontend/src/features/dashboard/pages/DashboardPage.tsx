@@ -65,7 +65,12 @@ export function DashboardPage() {
         <CardContent>
           <div className="grid grid-cols-2 gap-2 sm:grid-cols-3 lg:grid-cols-5">
             {ALL_TYPES.map((type) => {
-              const available = SUPPORTED_QUESTION_TYPES.includes(type);
+              // NGN_CASE isn't in SUPPORTED_QUESTION_TYPES itself (it's a
+              // wrapper that renders as whichever real type its ngn_type
+              // names, not a renderer of its own — see effectiveQuestionType),
+              // but every type it can wrap to is now supported, so it reads
+              // as available here too.
+              const available = type === "NGN_CASE" || SUPPORTED_QUESTION_TYPES.includes(type);
               return (
                 <div
                   key={type}
