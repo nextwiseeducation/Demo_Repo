@@ -5,6 +5,7 @@
 # because create_user()/create_superuser() aren't provided automatically
 # when using AbstractBaseUser, unlike Django's default User).
 from django.contrib.auth.base_user import AbstractBaseUser, BaseUserManager
+
 # PermissionsMixin adds is_superuser, groups, user_permissions, and the
 # has_perm()/has_module_perms() methods — needed so this custom User can
 # still be used with Django's permission system and the admin site.
@@ -17,7 +18,7 @@ from django.db import models
 # AbstractBaseUser already provides its own timing field (date_joined is
 # redefined below rather than inherited, and there's no updated_at need for
 # User specifically).
-from apps.core.models import TimeStampedMixin, UUIDPKMixin
+from apps.core.models import UUIDPKMixin
 
 
 class UserManager(BaseUserManager):
@@ -61,7 +62,9 @@ class UserManager(BaseUserManager):
         # have both flags True.
         extra_fields.setdefault("is_staff", True)
         extra_fields.setdefault("is_superuser", True)
-        extra_fields.setdefault("is_active", True)  # superusers created via `createsuperuser` should be able to log in immediately, bypassing the normal email-verification gate
+        extra_fields.setdefault(
+            "is_active", True
+        )  # superusers created via `createsuperuser` should be able to log in immediately, bypassing the normal email-verification gate
 
         if extra_fields.get("is_staff") is not True:
             raise ValueError("Superuser must have is_staff=True")

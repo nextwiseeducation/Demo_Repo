@@ -1,7 +1,50 @@
+from django.core.exceptions import ValidationError
+from django.core.validators import FileExtensionValidator
 from django.db import models
 
 from apps.core.models import TimeStampedMixin, UUIDPKMixin
-from apps.taxonomy.models import CaseStudy, ClientNeedsCategory, ClientNeedsSubcategory, NursingSystem, Subtopic, Tag, Topic
+from apps.taxonomy.models import (
+    CaseStudy,
+    ClientNeedsCategory,
+    ClientNeedsSubcategory,
+    NursingSystem,
+    Subtopic,
+    Tag,
+    Topic,
+)
+
+# Matches DATA_UPLOAD_MAX_MEMORY_SIZE/FILE_UPLOAD_MAX_MEMORY_SIZE in
+# config/settings/base.py — those bound what Django will accept for a whole
+# request; this bounds the single field, so the limit is the same number
+# whichever layer rejects it first and an editor gets a field-level error
+# message rather than a generic 400 from the upload machinery.
+MAX_QUESTION_IMAGE_BYTES = 5 * 1024 * 1024
+
+# Raster formats only. Deliberately NOT svg: an SVG is an XML document that
+# can carry <script>, so the moment question images are served from a real
+# host (see MEDIA_ROOT's note in settings — production needs an object store
+# in front of this) an uploaded .svg becomes stored XSS running on the
+# platform's own origin. Same reasoning excludes .html/.htm and anything
+# else the browser will execute rather than decode as pixels.
+ALLOWED_QUESTION_IMAGE_EXTENSIONS = ["png", "jpg", "jpeg", "gif", "webp"]
+
+
+def validate_question_image_size(value) -> None:
+    """
+    Rejects an oversized Question.image upload with a readable field error.
+
+    Defined at module level, not as a lambda or a nested/bound function,
+    because Django serializes every validator on a field into the migration
+    that adds it — a callable the migration file can't import by path
+    (`apps.questions.models.validate_question_image_size`) can't be written
+    into a migration at all.
+    """
+
+    if value.size > MAX_QUESTION_IMAGE_BYTES:
+        raise ValidationError(
+            f"Image must be {MAX_QUESTION_IMAGE_BYTES // (1024 * 1024)} MB or smaller "
+            f"(this file is {value.size // 1024} KB)."
+        )
 
 
 class QuestionType(models.TextChoices):
@@ -68,6 +111,30 @@ class Question(UUIDPKMixin, TimeStampedMixin, models.Model):
     # for content-team auditing (when was this question added/last edited)
     # without any extra fields defined here.
 
+    # The content team's own stable identifier for a question (e.g.
+    # "NW-MCQ-001"), carried in the authoring spreadsheet/JSON and preserved
+    # here as the natural key an import can match on.
+    #
+    # Without it, the importer had to decide "have I seen this question
+    # before?" by comparing the full `stem` text — an unindexed comparison
+    # (a scan per row) that is also wrong in practice: correcting a single
+    # typo in a stem makes the question look brand new and silently
+    # imports a duplicate.
+    #
+    # null/blank because it is genuinely optional: questions written by
+    # hand in the Django admin have no upstream id, and the rows that
+    # existed before this field did have none either. unique=True still
+    # applies to the values that ARE set — Postgres treats NULLs as
+    # distinct, so any number of admin-authored rows can coexist while
+    # imported ones stay unique.
+    #
+    # Added now, deliberately, while the table holds a handful of rows.
+    # Retrofitting a natural key after the 4,000-question batch lands
+    # (CLAUDE.md, Milestone 2) would mean backfilling ids onto rows whose
+    # only link back to the source file is the very stem text that proved
+    # unreliable.
+    external_id = models.CharField(max_length=64, unique=True, null=True, blank=True)
+
     question_type = models.CharField(max_length=20, choices=QuestionType.choices)
     # When question_type=NGN_CASE, ngn_type says which item-type this case
     # question renders as (a case study is a sequence of ordinary items —
@@ -106,7 +173,18 @@ class Question(UUIDPKMixin, TimeStampedMixin, models.Model):
     # in; actual serving is handled by Django only when DEBUG=True (see
     # config/urls.py) — production needs a real file host in front of this
     # before question images can go live at scale.
-    image = models.FileField(upload_to="question_images/", null=True, blank=True)
+    # validators run on admin/form/serializer saves (they are not a database
+    # constraint), which is the path every upload actually takes here.
+    # See ALLOWED_QUESTION_IMAGE_EXTENSIONS above for why SVG is excluded.
+    image = models.FileField(
+        upload_to="question_images/",
+        null=True,
+        blank=True,
+        validators=[
+            FileExtensionValidator(allowed_extensions=ALLOWED_QUESTION_IMAGE_EXTENSIONS),
+            validate_question_image_size,
+        ],
+    )
 
     difficulty = models.CharField(max_length=10, choices=Difficulty.choices)
 
@@ -179,6 +257,26 @@ class Question(UUIDPKMixin, TimeStampedMixin, models.Model):
         # the admin's question list (recently added/imported content is
         # what an editor is most likely checking).
         ordering = ["-created_at"]
+        indexes = [
+            # The quiz-builder query: "active questions, optionally narrowed
+            # by type and difficulty, newest first" (CLAUDE.md Milestone 3 —
+            # quiz creation with filters). Composite and column order both
+            # matter: is_active leads because every such query filters on it
+            # and it is the most selective single condition once retired
+            # content accumulates; -created_at trails so the index can also
+            # satisfy the default ordering without a separate sort step.
+            # A prefix of a composite index is usable on its own, so this
+            # also serves is_active alone and is_active+question_type.
+            models.Index(
+                fields=["is_active", "question_type", "difficulty", "-created_at"],
+                name="question_active_filter_idx",
+            ),
+            # Taxonomy-driven filtering ("give me Cardiovascular questions")
+            # is the other half of quiz building. The FK columns are already
+            # indexed individually by Django, but not as a pair, so a query
+            # constraining both still had to intersect two indexes.
+            models.Index(fields=["nursing_system", "topic"], name="question_taxonomy_idx"),
+        ]
 
     def __str__(self):
         # [MCQ] A client with heart failure reports weight... — truncated
@@ -282,8 +380,11 @@ class MatrixCell(models.Model):
     class Meta:
         # Guarantees at most one cell per (row, column) pair — a grid can't
         # have two different "is this correct" answers for the same
-        # intersection.
-        unique_together = ("row", "column")
+        # intersection. Expressed as a named UniqueConstraint rather than
+        # the older unique_together, which current Django steers away from.
+        constraints = [
+            models.UniqueConstraint(fields=["row", "column"], name="unique_matrix_cell_per_row_column")
+        ]
 
     def __str__(self):
         return f"{self.row} x {self.column} ({'correct' if self.is_correct else 'incorrect'})"
@@ -335,7 +436,11 @@ class ClozeBlank(models.Model):
         ordering = ["display_order"]
         # A given question can't define the same blank_key twice — each
         # placeholder token must uniquely identify one ClozeBlank.
-        unique_together = ("question", "blank_key")
+        constraints = [
+            models.UniqueConstraint(
+                fields=["question", "blank_key"], name="unique_cloze_blank_key_per_question"
+            )
+        ]
 
     def __str__(self):
         return self.blank_key

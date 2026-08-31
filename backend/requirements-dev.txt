@@ -1,0 +1,15 @@
+# Development-only dependencies. NOT installed on Render — render.yaml's
+# build command installs requirements.txt alone, so nothing here ships to
+# production or affects the deployed image.
+#
+# Install locally with:  pip install -r requirements-dev.txt
+
+-r requirements.txt
+
+# Formatter + linter. Configured in pyproject.toml ([tool.ruff]), which is
+# the single shared definition of "correctly formatted" for this repo, so
+# every contributor and any future CI run agree without argument.
+#   ruff format .     -> apply formatting
+#   ruff check .      -> lint
+#   ruff check --fix . -> lint and autofix what is safely fixable
+ruff==0.14.2

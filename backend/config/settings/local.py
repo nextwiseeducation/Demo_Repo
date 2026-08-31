@@ -18,3 +18,12 @@ ALLOWED_HOSTS = ["localhost", "127.0.0.1"]
 # end-to-end locally (verification links included) without any email
 # provider credentials — the runserver terminal output *is* the inbox.
 EMAIL_BACKEND = "django.core.mail.backends.console.EmailBackend"
+
+# base.py configures a database-backed cache (so DRF's rate limiting works
+# correctly across gunicorn workers in production). That table has to exist
+# before anything touches the cache, so a fresh local checkout needs a
+# one-off `python manage.py createcachetable` alongside `migrate`. Django's
+# test runner creates it automatically, so the test suite needs no such step.
+#
+# Kept identical to production rather than swapped for a simpler in-memory
+# cache, so throttling behaves the same way locally as it does deployed.

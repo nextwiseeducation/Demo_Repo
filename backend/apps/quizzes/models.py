@@ -19,7 +19,9 @@ class QuizSession(UUIDPKMixin, models.Model):
     # user model in a ForeignKey — avoids a hard cross-app import and
     # respects whatever AUTH_USER_MODEL is configured to, even though in
     # practice it always resolves to apps.accounts.User here.
-    student = models.ForeignKey(settings.AUTH_USER_MODEL, on_delete=models.CASCADE, related_name="quiz_sessions")
+    student = models.ForeignKey(
+        settings.AUTH_USER_MODEL, on_delete=models.CASCADE, related_name="quiz_sessions"
+    )
     # The actual set of questions in this quiz — a ManyToMany rather than a
     # fixed-size set of ForeignKeys, since a quiz can contain any number of
     # questions decided at creation time by the student's filter choices.
@@ -61,7 +63,9 @@ class StudentResponseLog(UUIDPKMixin, models.Model):
     clinical judgment analysis (see CLAUDE.md).
     """
 
-    student = models.ForeignKey(settings.AUTH_USER_MODEL, on_delete=models.CASCADE, related_name="response_logs")
+    student = models.ForeignKey(
+        settings.AUTH_USER_MODEL, on_delete=models.CASCADE, related_name="response_logs"
+    )
     question = models.ForeignKey(Question, on_delete=models.CASCADE, related_name="response_logs")
     # Single-answer question types (MCQ, EMR-as-single) use selected_choice;
     # SATA/EMR-multi use selected_choices. Both stay nullable/optional since

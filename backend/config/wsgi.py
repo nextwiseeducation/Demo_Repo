@@ -16,7 +16,7 @@ from django.core.wsgi import get_wsgi_application
 # since this is the module gunicorn actually imports on Render (see
 # Procfile: `gunicorn config.wsgi:application`). setdefault() still lets an
 # explicit DJANGO_SETTINGS_MODULE env var override this if ever needed.
-os.environ.setdefault('DJANGO_SETTINGS_MODULE', 'config.settings.production')
+os.environ.setdefault("DJANGO_SETTINGS_MODULE", "config.settings.production")
 
 # The actual WSGI callable — this is the object gunicorn calls for every
 # incoming HTTP request once the process boots.

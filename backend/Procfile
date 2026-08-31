@@ -1,2 +1,11 @@
-release: python manage.py migrate --noinput
+# Render reads its build and start commands from render.yaml at the repo
+# root, not from this file — render.yaml's `startCommand` is what actually
+# launches the service. This Procfile is kept only as a fallback for running
+# the app on a Procfile-driven host (or a Render service created without a
+# blueprint), and must be kept in step with render.yaml's startCommand.
+#
+# A `release:` line previously lived here declaring the migration step. That
+# was Heroku syntax: Render ignores it, so migrations were in fact only ever
+# run by render.yaml's buildCommand. It has been removed rather than fixed,
+# so there is exactly one place that defines how migrations run.
 web: gunicorn config.wsgi --log-file -

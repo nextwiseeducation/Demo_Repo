@@ -19,6 +19,22 @@ class StripeWebhookView(APIView):
     # because the handler below does nothing with the request body yet.
     permission_classes = [AllowAny]
 
+    # Deliberately NOT rate-limited, unlike every other unauthenticated
+    # endpoint in this project.
+    #
+    # Throttling a webhook receiver is actively harmful: Stripe delivers
+    # events in bursts (a billing run touches many subscriptions at once)
+    # and treats any non-2xx as a delivery failure to retry with backoff.
+    # A throttle would therefore turn a legitimate burst into rejected
+    # events, retry storms, and — once this handler does real work in Phase
+    # 2 — subscription states that silently fall out of sync with Stripe.
+    #
+    # The right control for a webhook is authenticity, not volume: verify
+    # the Stripe-Signature header against STRIPE_WEBHOOK_SECRET and reject
+    # anything unsigned. That is Phase 2 work, and until it exists this
+    # endpoint is safe only because it reads nothing and does nothing.
+    throttle_classes = []
+
     def post(self, request):
         # Always returns 200 immediately with no processing — this is
         # deliberately a no-op. The real handler (Phase 2) will need to:

@@ -1,5 +1,6 @@
 #!/usr/bin/env python
 """Django's command-line utility for administrative tasks."""
+
 # Standard library — os is used to set the settings module env var,
 # sys is used to hand the CLI args off to Django's command dispatcher.
 import os
@@ -14,7 +15,7 @@ def main():
     # why `python manage.py runserver` works locally without extra flags —
     # production instead sets DJANGO_SETTINGS_MODULE=config.settings.production
     # directly via the Render environment (see wsgi.py), bypassing this default.
-    os.environ.setdefault('DJANGO_SETTINGS_MODULE', 'config.settings.local')
+    os.environ.setdefault("DJANGO_SETTINGS_MODULE", "config.settings.local")
     try:
         # Imported here (not at module top) so that a missing/broken Django
         # install raises the friendlier ImportError message below instead of
@@ -31,5 +32,5 @@ def main():
     execute_from_command_line(sys.argv)
 
 
-if __name__ == '__main__':
+if __name__ == "__main__":
     main()

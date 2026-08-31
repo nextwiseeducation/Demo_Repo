@@ -1,64 +1,103 @@
 from rest_framework import generics, status
 from rest_framework.response import Response
+from rest_framework.throttling import ScopedRateThrottle
 from rest_framework.views import APIView
 
 from .models import Question
-from .serializers import QuestionListSerializer
+from .serializers import QuestionListSerializer, QuestionSubmitSerializer
+from .services import QuestionNotGradeable, build_answer_key, grade_submission
 
 
 class QuestionListView(generics.ListAPIView):
     """
-    GET /api/questions/ — every active question, answer key omitted (see
-    PublicAnswerChoiceSerializer). No server-side filtering yet: the quiz
-    setup UI filters this list client-side, same as it did against the mock
-    data it's replacing. Real filter/search query params belong to
-    Milestone 2/3, once the question bank is large enough to need them —
-    fetching the whole active set is fine at this scale.
+    GET /api/questions/ — active questions, answer key omitted (see
+    PublicAnswerChoiceSerializer).
+
+    No server-side filtering yet: the quiz setup UI filters this list
+    client-side, same as it did against the mock data it replaced. Real
+    filter/search query params belong to Milestone 2/3.
+
+    Paginated via the project-wide DEFAULT_PAGINATION_CLASS
+    (apps/core/pagination.py), NOT because this view opts in. That is worth
+    knowing before adding filtering here: this endpoint used to return every
+    active question in one unpaginated response, which was survivable only
+    while the bank held a dozen rows. At the specced 4,000+ questions
+    (CLAUDE.md), each serializing its stem, clinical scenario and every
+    answer choice, that response ran to megabytes on Render's free tier.
+    Clients must page through; they cannot assume one request sees
+    everything.
     """
 
-    queryset = Question.objects.filter(is_active=True).select_related(
-        "nursing_system", "topic", "nclex_client_needs_category"
-    ).prefetch_related("answer_choices")
+    queryset = (
+        Question.objects.filter(is_active=True)
+        .select_related("nursing_system", "topic", "nclex_client_needs_category")
+        .prefetch_related("answer_choices")
+    )
     serializer_class = QuestionListSerializer
 
 
 class QuestionSubmitView(APIView):
     """
-    POST /api/questions/<id>/submit/ — grades a single question and reveals
-    the answer key (is_correct + rationale per choice) now that the student
-    has actually answered.
+    POST /api/questions/<id>/submit/ — grades one question and reveals the
+    answer key (is_correct + rationale per choice) now that the student has
+    actually answered.
 
     Stateless: nothing is persisted (no StudentResponseLog row). Doing that
     for real needs a QuizSession to attach it to, and QuizSession has no API
     of its own yet (Milestone 3 scope per CLAUDE.md) — the quiz UI already
-    tells students results aren't saved in this preview ("it isn't saved to
-    your account").
+    tells students results aren't saved in this preview.
 
-    Grading rule (exact selected-set match) mirrors the frontend's
-    isAnswerCorrect, which is itself flagged as "the simplest defensible
-    SATA rule, pending Milestone 3's real grading logic" — see
-    quizSessionReducer.ts.
+    KNOWN RESIDUAL RISK — read before extending this endpoint.
+    Grading is the moment the answer key becomes visible, and because
+    nothing is recorded, there is no cost to asking. Any authenticated
+    account can therefore walk the question bank and harvest the key by
+    submitting an arbitrary guess per question; the id of every active
+    question is available from the list endpoint above. Two things bound
+    that today: a submission must contain at least one real selection (so
+    merely skipping a question no longer returns its answers), and the
+    "question_submit" throttle caps the rate at 300/hour — far above a real
+    quiz-taker, far below a practical scrape of thousands of questions.
+    Neither is a fix. The actual fix arrives with Milestone 3: grade only
+    within a QuizSession, and write a StudentResponseLog row each time, so
+    that answers are revealed once per question per attempt and any
+    harvesting shows up as data rather than passing unseen.
+
+    Grading itself lives in services.py, not here — Milestone 3's quiz
+    engine and Phase 2's analytics need the identical rule, and SATA
+    partial credit will change it.
     """
 
+    throttle_classes = [ScopedRateThrottle]
+    throttle_scope = "question_submit"
+
     def post(self, request, pk):
+        # Validated before the question is even fetched: a malformed body is
+        # a client error regardless of whether the id exists, and checking
+        # first keeps a bad payload from reaching the grading code.
+        serializer = QuestionSubmitSerializer(data=request.data)
+        serializer.is_valid(raise_exception=True)
+
         try:
             question = Question.objects.prefetch_related("answer_choices").get(pk=pk, is_active=True)
         except Question.DoesNotExist:
+            # is_active=True is part of the lookup, so a retired question is
+            # reported as missing rather than being gradeable — a question
+            # pulled from circulation should not still be answerable.
             return Response({"detail": "Not found."}, status=status.HTTP_404_NOT_FOUND)
 
-        choices = list(question.answer_choices.all())
-        valid_ids = {str(c.id) for c in choices}
-        # Any id in the request that isn't actually one of this question's
-        # choices (malformed/tampered request) is silently dropped rather
-        # than erroring — grading just treats it as "not selected".
-        selected_ids = {str(i) for i in request.data.get("selected_choice_ids", [])} & valid_ids
-        correct_ids = {str(c.id) for c in choices if c.is_correct}
+        try:
+            graded = grade_submission(question, serializer.validated_data["selected_choice_ids"])
+        except QuestionNotGradeable:
+            # The question has no correct answer recorded — a content bug,
+            # not something the student did wrong, so it must not be
+            # reported as a wrong answer. 409 Conflict says the request was
+            # fine but the resource is in a state that can't satisfy it.
+            # Deliberately vague to the client (the detailed reason is in
+            # the exception, for logs) while still being actionable enough
+            # for the UI to say "skip this one".
+            return Response(
+                {"detail": "This question is not available for grading."},
+                status=status.HTTP_409_CONFLICT,
+            )
 
-        return Response(
-            {
-                "is_correct": selected_ids == correct_ids,
-                "choices": [
-                    {"id": str(c.id), "is_correct": c.is_correct, "rationale": c.rationale} for c in choices
-                ],
-            }
-        )
+        return Response({"is_correct": graded.is_correct, "choices": build_answer_key(question)})

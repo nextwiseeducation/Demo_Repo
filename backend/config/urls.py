@@ -7,11 +7,18 @@ from django.urls import include, path
 # /api/<app>/ and delegates to that app's own urls.py — this file only
 # decides the top-level prefixes, not individual endpoint paths.
 urlpatterns = [
-    path("admin/", admin.site.urls),  # Django admin — the interim staff UI (content-team question entry is Milestone 2's custom admin work)
-    path("api/auth/", include("apps.accounts.urls")),  # register/login/logout/verify-email/password-reset/me
-    path("api/payments/", include("apps.payments.urls")),  # Stripe webhook endpoint (stubbed, Phase 2)
-    path("api/feedback/", include("apps.feedback.urls")),  # end-of-quiz survey + per-question issue reports
-    path("api/questions/", include("apps.questions.urls")),  # minimal read + grade endpoints so the quiz UI can use real content; full filtering/search is still Milestone 2/3 scope
+    # Django admin — the interim staff UI (content-team question entry is
+    # Milestone 2's custom admin work).
+    path("admin/", admin.site.urls),
+    # register/login/logout/verify-email/password-reset/me
+    path("api/auth/", include("apps.accounts.urls")),
+    # Stripe webhook endpoint (stubbed, Phase 2).
+    path("api/payments/", include("apps.payments.urls")),
+    # End-of-quiz survey + per-question issue reports.
+    path("api/feedback/", include("apps.feedback.urls")),
+    # Minimal read + grade endpoints so the quiz UI can use real content;
+    # full filtering/search is still Milestone 2/3 scope.
+    path("api/questions/", include("apps.questions.urls")),
     # apps.taxonomy / apps.quizzes have no urls.py yet — their models are
     # complete (Milestone 1 scope) but the REST endpoints to read/write them
     # are Milestone 2/3 scope, so nothing is wired here.

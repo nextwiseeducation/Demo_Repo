@@ -10,7 +10,23 @@ services:
     runtime: python
     plan: free
     rootDir: backend
-    buildCommand: "pip install -r requirements.txt && python manage.py collectstatic --noinput && python manage.py migrate --noinput && python manage.py ensure_superuser"
+    # createcachetable creates the table backing the database cache
+    # (config/settings/base.py CACHES), which is where DRF stores its
+    # rate-limit counters — without it, the first throttled request errors.
+    # It is idempotent, so it is safe on every deploy.
+    #
+    # seed_client_needs installs the official NCSBN Client Needs categories.
+    # The question importer looks these up strictly and refuses to invent
+    # them, so that a typo in a content file cannot quietly fabricate an
+    # "official" exam category — which means they have to be put there
+    # deliberately, by this. Also idempotent.
+    #
+    # Migrations run here rather than in a preDeployCommand because Render's
+    # free plan doesn't offer one. The trade-off to know about: the build
+    # step runs before the new instance goes live, so a migration applies
+    # even if the deploy that follows it fails. Worth moving to
+    # preDeployCommand if this service is ever upgraded to a paid plan.
+    buildCommand: "pip install -r requirements.txt && python manage.py collectstatic --noinput && python manage.py migrate --noinput && python manage.py createcachetable && python manage.py seed_client_needs && python manage.py ensure_superuser"
     startCommand: "gunicorn config.wsgi --log-file -"
     envVars:
       - key: DJANGO_SETTINGS_MODULE
@@ -36,8 +52,14 @@ services:
       # Bootstraps the one initial /admin/ login (see
       # apps/accounts/management/commands/ensure_superuser.py) — Render's
       # free web-service plan has no Shell/SSH access, so `createsuperuser`
-      # can't be run interactively after deploy. Safe to leave set
-      # permanently: the command no-ops on every deploy after the first.
+      # can't be run interactively after deploy.
+      #
+      # SECURITY: clear DJANGO_SUPERUSER_PASSWORD from the Render dashboard
+      # once the first deploy has succeeded and the admin account exists.
+      # The command no-ops from then on, so leaving it set gains nothing
+      # while keeping a live admin password sitting in the service's
+      # environment, readable by anyone with dashboard access. Set it again
+      # temporarily only if the admin account ever needs re-bootstrapping.
       - key: DJANGO_SUPERUSER_EMAIL
         sync: false
       - key: DJANGO_SUPERUSER_PASSWORD

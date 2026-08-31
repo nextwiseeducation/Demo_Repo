@@ -1,16 +1,19 @@
 from django.contrib.auth import get_user_model
 from django.contrib.auth.tokens import default_token_generator
+
 # django.core.mail.outbox — when EMAIL_BACKEND is Django's test backend
 # (automatically substituted during test runs regardless of what
 # local.py/production.py configure), every send_mail() call is appended
 # here instead of actually being sent — lets tests assert on subject/body
 # without a real mail provider.
 from django.core import mail
+
 # The default cache backend — used directly in ThrottlingTests because
 # DRF's throttle classes store request counts/timestamps in the cache, so
 # clearing it is required for throttle tests to start from a clean state
 # each run.
 from django.core.cache import cache
+
 # reverse() resolves a URL name (e.g. "login", set in urls.py) to its
 # actual path — tests use names instead of hardcoded path strings so they
 # don't break if a URL path is ever restructured.
@@ -18,6 +21,7 @@ from django.urls import reverse
 from django.utils.encoding import force_bytes
 from django.utils.http import urlsafe_base64_encode
 from rest_framework import status
+
 # APITestCase (DRF's test case) provides self.client as a DRF-aware test
 # client (handles JSON request/response bodies, exposes response.data)
 # instead of Django's default TestCase's HTML-oriented test client.
@@ -29,11 +33,35 @@ from .tokens import make_verification_token
 User = get_user_model()
 
 
+def registration_payload(**overrides):
+    """
+    A complete, valid registration POST body.
+
+    Exists because RegisterSerializer requires `accepted_disclaimer` and
+    `accepted_terms` — the server-side gate behind the registration page's
+    two legal checkboxes. They were added to the serializer without the
+    tests being updated, which turned the whole registration suite red and,
+    worse, silently disabled the throttling test below (it died on its
+    first assertion, so it stopped exercising the throttle it exists to
+    verify). Building the body in one place means a future required field
+    breaks one function, not every registration test.
+    """
+    payload = {
+        "email": "student@example.com",
+        "password": "a-strong-password-123",
+        "full_name": "Jane Student",
+        "accepted_disclaimer": True,
+        "accepted_terms": True,
+    }
+    payload.update(overrides)
+    return payload
+
+
 class RegistrationAndVerificationTests(APITestCase):
     def test_register_creates_inactive_user_and_sends_email(self):
         response = self.client.post(
             reverse("register"),
-            {"email": "student@example.com", "password": "a-strong-password-123", "full_name": "Jane Student"},
+            registration_payload(),
         )
         self.assertEqual(response.status_code, status.HTTP_201_CREATED)
 
@@ -91,7 +119,9 @@ class LoginTests(APITestCase):
         )
 
     def test_login_succeeds_for_verified_user(self):
-        response = self.client.post(reverse("login"), {"email": "active@example.com", "password": self.password})
+        response = self.client.post(
+            reverse("login"), {"email": "active@example.com", "password": self.password}
+        )
         self.assertEqual(response.status_code, status.HTTP_200_OK)
         # Confirms the response actually contains both JWTs — a 200 alone
         # wouldn't prove the token payload is shaped correctly.
@@ -104,13 +134,17 @@ class LoginTests(APITestCase):
         # TokenObtainPairView rather than any custom code in this project —
         # still worth testing explicitly since it's load-bearing for the
         # "must verify email first" requirement.
-        response = self.client.post(reverse("login"), {"email": "inactive@example.com", "password": self.password})
+        response = self.client.post(
+            reverse("login"), {"email": "inactive@example.com", "password": self.password}
+        )
         self.assertEqual(response.status_code, status.HTTP_401_UNAUTHORIZED)
 
 
 class LogoutTests(APITestCase):
     def test_logout_blacklists_refresh_token(self):
-        user = User.objects.create_user(email="student@example.com", password="a-strong-password-123", is_active=True)
+        User.objects.create_user(
+            email="student@example.com", password="a-strong-password-123", is_active=True
+        )
         login_response = self.client.post(
             reverse("login"), {"email": "student@example.com", "password": "a-strong-password-123"}
         )
@@ -134,7 +168,9 @@ class LogoutTests(APITestCase):
 
 class PasswordResetTests(APITestCase):
     def setUp(self):
-        self.user = User.objects.create_user(email="student@example.com", password="old-password-123", is_active=True)
+        self.user = User.objects.create_user(
+            email="student@example.com", password="old-password-123", is_active=True
+        )
 
     def test_request_reset_sends_email_for_existing_user(self):
         response = self.client.post(reverse("password-reset"), {"email": "student@example.com"})
@@ -227,7 +263,7 @@ class ThrottlingTests(APITestCase):
         for i in range(2):
             response = self.client.post(
                 reverse("register"),
-                {"email": f"student{i}@example.com", "password": "a-strong-password-123"},
+                registration_payload(email=f"student{i}@example.com"),
             )
             self.assertEqual(response.status_code, status.HTTP_201_CREATED)
 
@@ -235,7 +271,7 @@ class ThrottlingTests(APITestCase):
         # by the throttle before it even reaches the view logic.
         response = self.client.post(
             reverse("register"),
-            {"email": "student-over-limit@example.com", "password": "a-strong-password-123"},
+            registration_payload(email="student-over-limit@example.com"),
         )
         self.assertEqual(response.status_code, status.HTTP_429_TOO_MANY_REQUESTS)
 
@@ -255,14 +291,19 @@ class ThrottlingTests(APITestCase):
 
         # 3rd attempt within the window is throttled (429) rather than
         # evaluated for credential correctness (which would be 401 again).
-        response = self.client.post(reverse("login"), {"email": "student@example.com", "password": "incorrect"})
+        response = self.client.post(
+            reverse("login"), {"email": "student@example.com", "password": "incorrect"}
+        )
         self.assertEqual(response.status_code, status.HTTP_429_TOO_MANY_REQUESTS)
 
 
 class MeTests(APITestCase):
     def test_returns_current_user(self):
-        user = User.objects.create_user(
-            email="student@example.com", password="a-strong-password-123", full_name="Jane Student", is_active=True
+        User.objects.create_user(
+            email="student@example.com",
+            password="a-strong-password-123",
+            full_name="Jane Student",
+            is_active=True,
         )
         login_response = self.client.post(
             reverse("login"), {"email": "student@example.com", "password": "a-strong-password-123"}
@@ -284,3 +325,221 @@ class MeTests(APITestCase):
         # against someone accidentally weakening permission_classes later).
         response = self.client.get(reverse("me"))
         self.assertEqual(response.status_code, status.HTTP_401_UNAUTHORIZED)
+
+
+class RegistrationEnumerationTests(APITestCase):
+    """
+    Registering an address that already has an account must be
+    indistinguishable from registering a fresh one.
+
+    Registration previously answered a duplicate with a 400 ("user with
+    this email already exists"), which let anyone probe the endpoint to
+    learn which addresses have accounts here. That mattered particularly
+    because the password-reset endpoint deliberately avoids the same leak
+    (see PasswordResetTests.test_request_reset_does_not_leak_unknown_email)
+    — one endpoint quietly undid the other's protection.
+    """
+
+    def test_duplicate_email_returns_identical_response_to_a_fresh_registration(self):
+        # The response to a genuinely new address is the baseline that the
+        # duplicate case has to match exactly.
+        fresh = self.client.post(reverse("register"), registration_payload(email="new@example.com"))
+        self.assertEqual(fresh.status_code, status.HTTP_201_CREATED)
+
+        duplicate = self.client.post(reverse("register"), registration_payload(email="new@example.com"))
+
+        # Both the status code and the body must match. A difference in
+        # either one is all an attacker needs to tell the two cases apart,
+        # which is the whole vulnerability.
+        self.assertEqual(duplicate.status_code, fresh.status_code)
+        self.assertEqual(duplicate.data, fresh.data)
+
+    def test_duplicate_email_does_not_create_a_second_account(self):
+        self.client.post(reverse("register"), registration_payload(email="taken@example.com"))
+        self.client.post(reverse("register"), registration_payload(email="taken@example.com"))
+
+        self.assertEqual(User.objects.filter(email__iexact="taken@example.com").count(), 1)
+
+    def test_duplicate_email_notifies_the_real_owner_instead_of_verifying(self):
+        self.client.post(reverse("register"), registration_payload(email="owner@example.com"))
+        mail.outbox.clear()
+
+        self.client.post(reverse("register"), registration_payload(email="owner@example.com"))
+
+        # Exactly one email, addressed to the existing account holder —
+        # this is the point of the design: the person who submitted the
+        # form learns nothing, while the actual owner is told an attempt
+        # happened.
+        self.assertEqual(len(mail.outbox), 1)
+        self.assertEqual(mail.outbox[0].to, ["owner@example.com"])
+        # Must NOT be another verification email: sending one would let an
+        # attacker trigger real verification mail for an address they do
+        # not control, and would imply a new account had been created.
+        self.assertNotIn("verify", mail.outbox[0].subject.lower())
+
+    def test_duplicate_detection_is_case_insensitive(self):
+        # UserManager.create_user normalizes the domain part of an address,
+        # so a differently-cased duplicate must still be recognised rather
+        # than falling through to a create that the database would reject.
+        self.client.post(reverse("register"), registration_payload(email="mixed@example.com"))
+        response = self.client.post(reverse("register"), registration_payload(email="MIXED@Example.com"))
+
+        self.assertEqual(response.status_code, status.HTTP_201_CREATED)
+        self.assertEqual(User.objects.filter(email__iexact="mixed@example.com").count(), 1)
+
+
+class PasswordStrengthTests(APITestCase):
+    """
+    AUTH_PASSWORD_VALIDATORS includes UserAttributeSimilarityValidator,
+    which rejects a password that is a lightly-disguised copy of the user's
+    own email or name. It only works when validate_password() is handed the
+    user — as a bare DRF field validator it received user=None and did
+    nothing at all, silently. These tests pin that it is actually wired up.
+    """
+
+    def test_registration_rejects_password_similar_to_email(self):
+        response = self.client.post(
+            reverse("register"),
+            registration_payload(email="jane.harrington@example.com", password="jane.harrington"),
+        )
+
+        self.assertEqual(response.status_code, status.HTTP_400_BAD_REQUEST)
+        # Keyed on the field, so the frontend form can show the error
+        # against the password input rather than as a form-level message.
+        self.assertIn("password", response.data)
+        self.assertFalse(User.objects.filter(email__iexact="jane.harrington@example.com").exists())
+
+    def test_registration_rejects_common_password(self):
+        response = self.client.post(reverse("register"), registration_payload(password="password123"))
+        self.assertEqual(response.status_code, status.HTTP_400_BAD_REQUEST)
+        self.assertIn("password", response.data)
+
+    def test_reset_confirm_rejects_weak_password(self):
+        # A reset must not become a way to set a password weaker than
+        # registration would ever have accepted.
+        user = User.objects.create_user(
+            email="student@example.com", password="a-strong-password-123", is_active=True
+        )
+        uid = urlsafe_base64_encode(force_bytes(user.pk))
+        token = default_token_generator.make_token(user)
+
+        response = self.client.post(
+            reverse("password-reset-confirm"),
+            {"uid": uid, "token": token, "new_password": "12345678"},
+        )
+
+        self.assertEqual(response.status_code, status.HTTP_400_BAD_REQUEST)
+        self.assertIn("new_password", response.data)
+        # The old password must still work — a rejected reset must not
+        # half-apply.
+        user.refresh_from_db()
+        self.assertTrue(user.check_password("a-strong-password-123"))
+
+
+class PasswordResetRevokesSessionsTests(APITestCase):
+    """
+    Resetting a password must evict existing sessions.
+
+    Otherwise the reset changes the password but leaves every
+    previously-issued refresh token valid for its full 14-day lifetime —
+    defeating the main reason someone resets a password: they believe they
+    are compromised, and the attacker holding a stolen token keeps access.
+    """
+
+    def setUp(self):
+        self.password = "a-strong-password-123"
+        self.user = User.objects.create_user(
+            email="student@example.com", password=self.password, is_active=True
+        )
+        login = self.client.post(
+            reverse("login"), {"email": "student@example.com", "password": self.password}
+        )
+        # This is the token standing in for one an attacker has stolen: it
+        # is issued BEFORE the reset and must stop working after it.
+        self.stolen_refresh = login.data["refresh"]
+
+    def _reset_password(self, new_password):
+        uid = urlsafe_base64_encode(force_bytes(self.user.pk))
+        token = default_token_generator.make_token(self.user)
+        return self.client.post(
+            reverse("password-reset-confirm"),
+            {"uid": uid, "token": token, "new_password": new_password},
+        )
+
+    def test_refresh_token_issued_before_reset_stops_working(self):
+        # Proves the precondition: the token is genuinely usable first, so a
+        # later failure can only be caused by the reset itself.
+        before = self.client.post(reverse("token-refresh"), {"refresh": self.stolen_refresh})
+        self.assertEqual(before.status_code, status.HTTP_200_OK)
+
+        self.assertEqual(self._reset_password("an-entirely-different-pw-99").status_code, status.HTTP_200_OK)
+
+        after = self.client.post(reverse("token-refresh"), {"refresh": self.stolen_refresh})
+        self.assertEqual(after.status_code, status.HTTP_401_UNAUTHORIZED)
+
+    def test_reset_is_idempotent_against_already_blacklisted_tokens(self):
+        # Logging out blacklists that refresh token; the reset then tries to
+        # blacklist every outstanding token for the user, including this
+        # already-blacklisted one. Without ignore_conflicts on the bulk
+        # insert, the duplicate row would raise and turn a successful reset
+        # into a 500.
+        self.client.credentials(
+            HTTP_AUTHORIZATION="Bearer {}".format(
+                self.client.post(
+                    reverse("login"), {"email": "student@example.com", "password": self.password}
+                ).data["access"]
+            )
+        )
+        self.client.post(reverse("logout"), {"refresh": self.stolen_refresh})
+        self.client.credentials()
+
+        self.assertEqual(self._reset_password("another-good-password-77").status_code, status.HTTP_200_OK)
+
+    def test_new_password_works_after_reset(self):
+        # The revocation must not be so eager that it breaks the actual
+        # goal of the flow.
+        self._reset_password("an-entirely-different-pw-99")
+
+        login = self.client.post(
+            reverse("login"), {"email": "student@example.com", "password": "an-entirely-different-pw-99"}
+        )
+        self.assertEqual(login.status_code, status.HTTP_200_OK)
+
+
+class PasswordResetInactiveAccountTests(APITestCase):
+    """
+    An account that never completed email verification must not be sent a
+    reset link. It would reset successfully and then still be unable to log
+    in (authenticate() rejects inactive users) with nothing explaining why —
+    verifying the address is what unblocks such an account, not resetting
+    its password. Mirrors Django's own PasswordResetForm, which filters
+    is_active=True.
+    """
+
+    def test_no_email_sent_for_unverified_account(self):
+        User.objects.create_user(
+            email="unverified@example.com", password="a-strong-password-123", is_active=False
+        )
+
+        response = self.client.post(reverse("password-reset"), {"email": "unverified@example.com"})
+
+        # Still the same generic 200 — skipping the send must not become a
+        # new way to detect which accounts exist or are verified.
+        self.assertEqual(response.status_code, status.HTTP_200_OK)
+        self.assertEqual(len(mail.outbox), 0)
+
+    def test_response_is_identical_for_verified_unverified_and_unknown(self):
+        User.objects.create_user(email="active@example.com", password="a-strong-password-123", is_active=True)
+        User.objects.create_user(
+            email="inactive@example.com", password="a-strong-password-123", is_active=False
+        )
+
+        responses = [
+            self.client.post(reverse("password-reset"), {"email": address})
+            for address in ("active@example.com", "inactive@example.com", "nobody@example.com")
+        ]
+
+        # All three must be byte-identical; any divergence is an
+        # enumeration oracle.
+        self.assertEqual({r.status_code for r in responses}, {status.HTTP_200_OK})
+        self.assertEqual(len({str(r.data) for r in responses}), 1)

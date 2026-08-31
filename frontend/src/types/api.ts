@@ -27,3 +27,21 @@ export interface NormalizedApiError {
   fieldErrors: ApiFieldErrors | null;
   isRateLimited: boolean;
 }
+
+/**
+ * DRF's PageNumberPagination envelope (backend: apps/core/pagination.py,
+ * wired in globally as DEFAULT_PAGINATION_CLASS).
+ *
+ * `next`/`previous` are absolute URLs built by DRF from the request it
+ * received. Deliberately not followed verbatim anywhere in this codebase:
+ * behind Vite's dev proxy the host DRF sees is not the host the browser
+ * talks to, so those links can point somewhere the browser cannot reach.
+ * Callers page by explicit `?page=N` against the relative path instead —
+ * see listQuestions().
+ */
+export interface Paginated<T> {
+  count: number;
+  next: string | null;
+  previous: string | null;
+  results: T[];
+}

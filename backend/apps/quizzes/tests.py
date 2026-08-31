@@ -2,6 +2,7 @@ from django.contrib.auth import get_user_model
 from django.test import TestCase
 
 from apps.questions.models import AnswerChoice
+
 # Reuses the make_question() fixture helper defined in apps.questions.tests
 # instead of duplicating that taxonomy + Question setup boilerplate here —
 # cross-app test-helper reuse, not a production code dependency.
@@ -79,7 +80,9 @@ class StudentResponseLogTests(TestCase):
         # choice was picked — this is what a future "why did I get this
         # wrong" AI feature needs to reference.
         question = make_question()
-        wrong_choice = AnswerChoice.objects.create(question=question, choice_text="Distractor", is_correct=False)
+        wrong_choice = AnswerChoice.objects.create(
+            question=question, choice_text="Distractor", is_correct=False
+        )
         session = self._make_session(question)
 
         response = StudentResponseLog.objects.create(

@@ -1,6 +1,7 @@
 import logging
 
 from django.conf import settings
+
 # Django's built-in mail-sending function — which backend actually delivers
 # the message (console print in dev, Resend via Anymail in production) is
 # decided entirely by EMAIL_BACKEND in settings, so this file never needs to
@@ -58,3 +59,46 @@ def send_password_reset_email(user, uid, token):
         )
     except Exception:
         logger.exception("Failed to send password reset email to %s", user.email)
+
+
+def send_duplicate_registration_email(user):
+    """
+    Sent when someone submits the registration form with an email address
+    that already has an account.
+
+    The register endpoint deliberately responds with the same generic 201 in
+    that case as it does for a brand-new account, so it can't be used to
+    enumerate which addresses are registered here. That silence has to go
+    somewhere useful though: this email is the "somewhere". The real owner
+    of the address finds out an attempt was made and is told what to do
+    (log in, or reset the password), while whoever submitted the form
+    learns nothing at all — they get the same response either way and this
+    message goes to the account holder's inbox, not theirs.
+
+    Deliberately says nothing about the submitted password or full name,
+    and creates nothing: it is purely a notification about an attempt.
+    """
+    login_url = f"{settings.FRONTEND_URL}/login"
+    reset_url = f"{settings.FRONTEND_URL}/forgot-password"
+    # Same swallow-and-log reasoning as the two senders above: RegisterView
+    # must return its generic 201 whatever happens here, or the difference
+    # between "email sent fine" and "email provider hiccuped" would itself
+    # become the enumeration signal this whole design exists to remove.
+    try:
+        send_mail(
+            subject="Someone tried to register with your NextWise Education email",
+            message=(
+                "Someone just tried to create a NextWise Education account using this email address, "
+                "which already has an account.\n\n"
+                "If that was you, you already have an account — sign in here:\n"
+                f"{login_url}\n\n"
+                "If you have forgotten your password, you can reset it here:\n"
+                f"{reset_url}\n\n"
+                "If it wasn't you, you can safely ignore this email. No new account was created and "
+                "nothing about your existing account has changed."
+            ),
+            from_email=settings.DEFAULT_FROM_EMAIL,
+            recipient_list=[user.email],
+        )
+    except Exception:
+        logger.exception("Failed to send duplicate-registration notice to %s", user.email)

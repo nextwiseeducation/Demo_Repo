@@ -6,6 +6,7 @@ environment / .env file via django-environ — see .env.example for the
 full list of variables this project reads.
 """
 
+from datetime import timedelta
 from pathlib import Path
 
 # django-environ — reads typed values (str/bool/int/list/db-url) out of
@@ -49,39 +50,96 @@ FRONTEND_URL = env("FRONTEND_URL", default="http://localhost:5173")
 
 INSTALLED_APPS = [
     # --- Django built-ins ---
-    "django.contrib.admin",  # /admin/ site, used as the interim staff UI (see CLAUDE.md — admin.py customization is Milestone 2)
-    "django.contrib.auth",  # provides PermissionsMixin/permission machinery our custom User model builds on, plus password hashing/validation
-    "django.contrib.contenttypes",  # required by auth's permission system (Permission rows reference a ContentType)
-    "django.contrib.sessions",  # backs Django admin's login sessions (the API itself is stateless/JWT — this is admin-only)
-    "django.contrib.messages",  # one-time flash messages, required by the admin UI
-    "django.contrib.staticfiles",  # collects/serves admin CSS/JS and any app static assets; whitenoise serves what it collects
+    # /admin/ site, used as the interim staff UI (see CLAUDE.md — admin.py
+    # customization is Milestone 2).
+    "django.contrib.admin",
+    # Provides PermissionsMixin/permission machinery our custom User model
+    # builds on, plus password hashing/validation.
+    "django.contrib.auth",
+    # Required by auth's permission system (Permission rows reference a
+    # ContentType).
+    "django.contrib.contenttypes",
+    # Backs Django admin's login sessions (the API itself is stateless/JWT —
+    # this is admin-only).
+    "django.contrib.sessions",
+    # One-time flash messages, required by the admin UI.
+    "django.contrib.messages",
+    # Collects/serves admin CSS/JS and any app static assets; whitenoise
+    # serves what it collects.
+    "django.contrib.staticfiles",
     # --- Third-party ---
-    "corsheaders",  # lets the browser-hosted React frontend (a different Render origin in staging/prod) call this API at all — without it, the browser blocks every cross-origin fetch before it reaches Django. Not needed in local dev, where Vite's proxy (vite.config.ts) makes requests same-origin instead.
-    "rest_framework",  # Django REST Framework — turns Django into a JSON API (serializers, viewsets, browsable API)
-    "rest_framework_simplejwt.token_blacklist",  # stores blacklisted refresh tokens in the DB; required because SIMPLE_JWT below has BLACKLIST_AFTER_ROTATION=True (logout/rotation needs somewhere to record "this token is now dead")
-    "anymail",  # provider-agnostic transactional email backend; lets EMAIL_BACKEND point at Resend in prod without Resend-specific code elsewhere (see the Email section below)
+    # Lets the browser-hosted React frontend (a different Render origin in
+    # staging/prod) call this API at all — without it, the browser blocks
+    # every cross-origin fetch before it reaches Django. Not needed in local
+    # dev, where Vite's proxy (vite.config.ts) makes requests same-origin.
+    "corsheaders",
+    # Django REST Framework — turns Django into a JSON API (serializers,
+    # viewsets, browsable API).
+    "rest_framework",
+    # Stores blacklisted refresh tokens in the DB; required because
+    # SIMPLE_JWT below has BLACKLIST_AFTER_ROTATION=True (logout, rotation,
+    # and password reset all need somewhere to record "this token is now
+    # dead").
+    "rest_framework_simplejwt.token_blacklist",
+    # Provider-agnostic transactional email backend; lets EMAIL_BACKEND
+    # point at Resend in prod without Resend-specific code elsewhere (see
+    # the Email section below).
+    "anymail",
     # --- Local apps (see apps/<name>/models.py for what each owns) ---
-    "apps.core",  # no models of its own yet; home for cross-app abstractions like the UUID-PK/timestamp mixins other apps' models inherit from
-    "apps.accounts",  # custom User model, registration/auth/JWT views
-    "apps.taxonomy",  # NursingSystem/Topic/Subtopic/ClientNeeds/Tag/CaseStudy — the classification schema questions are tagged against
-    "apps.questions",  # Question, AnswerChoice, and the NGN-item-type stub models (Matrix, Bow-Tie, Cloze, etc.)
-    "apps.quizzes",  # QuizSession + StudentResponseLog — quiz-taking and the per-answer log Phase 2's AI features will read
-    "apps.payments",  # SubscriptionPlan/UserSubscription — Stripe-shaped tables, stubbed and unused until Phase 2
-    "apps.feedback",  # QuizFeedback + QuestionIssueReport — end-of-quiz survey and per-question "Report an Issue" flags
+    # No models of its own; home for cross-app abstractions like the
+    # UUID-PK/timestamp mixins and the shared DRF pagination class.
+    "apps.core",
+    # Custom User model, registration/auth/JWT views.
+    "apps.accounts",
+    # NursingSystem/Topic/Subtopic/ClientNeeds/Tag/CaseStudy — the
+    # classification schema questions are tagged against.
+    "apps.taxonomy",
+    # Question, AnswerChoice, and the NGN-item-type stub models (Matrix,
+    # Bow-Tie, Cloze, etc.).
+    "apps.questions",
+    # QuizSession + StudentResponseLog — quiz-taking and the per-answer log
+    # Phase 2's AI features will read.
+    "apps.quizzes",
+    # SubscriptionPlan/UserSubscription — Stripe-shaped tables, stubbed and
+    # unused until Phase 2.
+    "apps.payments",
+    # QuizFeedback + QuestionIssueReport — end-of-quiz survey and
+    # per-question "Report an Issue" flags.
+    "apps.feedback",
 ]
 
 # Order matters: each request passes down through this list top-to-bottom,
 # then the response passes back up bottom-to-top.
 MIDDLEWARE = [
-    "django.middleware.security.SecurityMiddleware",  # HTTPS/HSTS-related headers; several of its behaviors are toggled on in production.py
-    "whitenoise.middleware.WhiteNoiseMiddleware",  # serves collected static files directly from the Django/gunicorn process on Render, no separate static file host needed — must sit right after SecurityMiddleware per whitenoise's own docs
-    "corsheaders.middleware.CorsMiddleware",  # must sit as high as practical, and specifically before CommonMiddleware, per django-cors-headers' own docs — it needs to attach CORS headers to a request/response before other middleware can short-circuit it
-    "django.contrib.sessions.middleware.SessionMiddleware",  # attaches request.session; needed for Django admin login, not used by the JWT API itself
-    "django.middleware.common.CommonMiddleware",  # misc conveniences (e.g. APPEND_SLASH)
-    "django.middleware.csrf.CsrfViewMiddleware",  # CSRF protection for session-authenticated (cookie-based) requests — i.e. the admin site; the JWT API is exempt in practice since it doesn't use cookies
-    "django.contrib.auth.middleware.AuthenticationMiddleware",  # attaches request.user for session-based auth (admin); DRF's JWTAuthentication (see REST_FRAMEWORK below) is what sets request.user for API calls
-    "django.contrib.messages.middleware.MessageMiddleware",  # backs django.contrib.messages, used by the admin UI
-    "django.middleware.clickjacking.XFrameOptionsMiddleware",  # sends X-Frame-Options to stop the admin site being iframed
+    # HTTPS/HSTS-related headers; several of its behaviors are toggled on in
+    # production.py.
+    "django.middleware.security.SecurityMiddleware",
+    # Serves collected static files directly from the Django/gunicorn
+    # process on Render, no separate static file host needed — must sit
+    # right after SecurityMiddleware per whitenoise's own docs.
+    "whitenoise.middleware.WhiteNoiseMiddleware",
+    # Must sit as high as practical, and specifically before
+    # CommonMiddleware, per django-cors-headers' own docs — it needs to
+    # attach CORS headers to a request/response before other middleware can
+    # short-circuit it.
+    "corsheaders.middleware.CorsMiddleware",
+    # Attaches request.session; needed for Django admin login, not used by
+    # the JWT API itself.
+    "django.contrib.sessions.middleware.SessionMiddleware",
+    # Misc conveniences (e.g. APPEND_SLASH).
+    "django.middleware.common.CommonMiddleware",
+    # CSRF protection for session-authenticated (cookie-based) requests —
+    # i.e. the admin site; the JWT API is exempt in practice since it
+    # doesn't use cookies.
+    "django.middleware.csrf.CsrfViewMiddleware",
+    # Attaches request.user for session-based auth (admin); DRF's
+    # JWTAuthentication (see REST_FRAMEWORK below) is what sets request.user
+    # for API calls.
+    "django.contrib.auth.middleware.AuthenticationMiddleware",
+    # Backs django.contrib.messages, used by the admin UI.
+    "django.contrib.messages.middleware.MessageMiddleware",
+    # Sends X-Frame-Options to stop the admin site being iframed.
+    "django.middleware.clickjacking.XFrameOptionsMiddleware",
 ]
 
 # Points Django at config/urls.py as the top-level URL dispatch table.
@@ -117,6 +175,31 @@ DATABASES = {
     "default": env.db("DATABASE_URL"),
 }
 
+
+# Cache
+#
+# Backed by a database table rather than Django's default in-memory
+# LocMemCache, because this cache is not just an optimization here — it is
+# where DRF stores rate-limit counters (see DEFAULT_THROTTLE_RATES below).
+#
+# LocMemCache is per-process, so under gunicorn's multiple worker processes
+# each worker would keep its own independent counter: a "5/hour"
+# registration limit would really be 5-per-hour-per-worker, and every deploy
+# or worker restart would silently reset every limit to zero. Neither is
+# acceptable for controls whose entire job is to bound abuse.
+#
+# DatabaseCache is shared across workers and survives restarts, and needs no
+# extra infrastructure — Render's free tier has no Redis, and the Postgres
+# instance is already there. The table it needs is created by
+# `manage.py createcachetable` (wired into render.yaml's build command;
+# Django's test runner creates it automatically for test databases).
+CACHES = {
+    "default": {
+        "BACKEND": "django.core.cache.backends.db.DatabaseCache",
+        "LOCATION": "django_cache",
+    },
+}
+
 # Tells Django to use apps.accounts.models.User (email-based, UUID PK)
 # instead of the default django.contrib.auth.models.User (username-based,
 # integer PK). Must be set before the first migration ever runs — changing
@@ -127,10 +210,14 @@ AUTH_USER_MODEL = "accounts.User"
 # set via Django's forms/serializers that call validate_password() —
 # registration and password reset both go through this.
 AUTH_PASSWORD_VALIDATORS = [
-    {"NAME": "django.contrib.auth.password_validation.UserAttributeSimilarityValidator"},  # rejects passwords too similar to the user's email/name
-    {"NAME": "django.contrib.auth.password_validation.MinimumLengthValidator"},  # default minimum length is 8
-    {"NAME": "django.contrib.auth.password_validation.CommonPasswordValidator"},  # rejects the ~20,000 most common passwords
-    {"NAME": "django.contrib.auth.password_validation.NumericPasswordValidator"},  # rejects all-digit passwords
+    # Rejects passwords too similar to the user's email/name.
+    {"NAME": "django.contrib.auth.password_validation.UserAttributeSimilarityValidator"},
+    # Default minimum length is 8.
+    {"NAME": "django.contrib.auth.password_validation.MinimumLengthValidator"},
+    # Rejects the ~20,000 most common passwords.
+    {"NAME": "django.contrib.auth.password_validation.CommonPasswordValidator"},
+    # Rejects all-digit passwords.
+    {"NAME": "django.contrib.auth.password_validation.NumericPasswordValidator"},
 ]
 
 
@@ -140,12 +227,16 @@ AUTH_PASSWORD_VALIDATORS = [
 LANGUAGE_CODE = "en-us"
 TIME_ZONE = "UTC"
 USE_I18N = True
-USE_TZ = True  # store all datetimes in UTC in the DB; convert to local time only at display time — avoids DST/timezone bugs across environments
+# Store all datetimes in UTC in the DB; convert to local time only at
+# display time — avoids DST/timezone bugs across environments.
+USE_TZ = True
 
 
 # Static files (admin CSS/JS, etc.)
 STATIC_URL = "static/"
-STATIC_ROOT = BASE_DIR / "staticfiles"  # `collectstatic` gathers every app's static files here; whitenoise serves from this directory
+# `collectstatic` gathers every app's static files here; whitenoise serves
+# from this directory.
+STATIC_ROOT = BASE_DIR / "staticfiles"
 STORAGES = {
     "staticfiles": {
         # Adds a content hash to each filename (cache-busting) and gzip/brotli
@@ -161,6 +252,18 @@ STORAGES = {
 # Render's filesystem isn't persistent/shared across dynos.
 MEDIA_URL = "media/"
 MEDIA_ROOT = BASE_DIR / "media"
+
+# Upload ceilings. Django's own defaults are 2.5MB in-memory and unlimited
+# on disk; these cap the on-disk side too, so a single request can't fill
+# Render's (small, non-persistent) filesystem. Question.image additionally
+# validates extension and size at the field level — see
+# apps/questions/models.py.
+DATA_UPLOAD_MAX_MEMORY_SIZE = 5 * 1024 * 1024  # 5 MB
+FILE_UPLOAD_MAX_MEMORY_SIZE = 5 * 1024 * 1024  # 5 MB
+# Bounds how many fields one form/multipart POST may contain — the default
+# is 1000; the admin's question-with-inline-choices form is the widest form
+# in the project and is nowhere near that.
+DATA_UPLOAD_MAX_NUMBER_FIELDS = 1000
 
 # Modern Django default for auto-generated model PKs (BigAutoField instead
 # of the older 32-bit AutoField). Doesn't affect this project's models
@@ -187,36 +290,75 @@ REST_FRAMEWORK = {
         # default than the alternative of forgetting to lock down a new view.
         "rest_framework.permissions.IsAuthenticated",
     ),
-    # Per-view rate limits (via ScopedRateThrottle, set on the auth views
-    # that are reachable without being logged in) — keyed by IP for
-    # anonymous requests. Prevents mass account creation, login
-    # brute-forcing, and using password-reset to spam arbitrary addresses.
-    # A view opts into one of these buckets by setting
+    # Paginate every list endpoint by default rather than per-view, so a
+    # list endpoint added later can't accidentally ship the whole table.
+    # See apps/core/pagination.py for the page size and its ceiling.
+    "DEFAULT_PAGINATION_CLASS": "apps.core.pagination.DefaultPagination",
+    # Per-view rate limits (via ScopedRateThrottle, set on the views that
+    # opt in) — keyed by IP for anonymous requests and by user id for
+    # authenticated ones. A view joins one of these buckets by setting
     # `throttle_scope = "<key>"`, e.g. LoginView uses "login".
+    #
+    # Counters live in the shared database cache configured above, so these
+    # limits hold across gunicorn workers and across restarts.
     "DEFAULT_THROTTLE_RATES": {
+        # --- Reachable while logged out ---
+        # Prevents mass account creation.
         "register": "5/hour",
+        # Slows password-guessing without affecting a user who mistypes.
         "login": "10/min",
+        # This endpoint emails an address supplied by the caller, so it also
+        # needs protecting against being used to spam arbitrary inboxes.
         "password_reset": "5/hour",
+        # Guessable-token brute-force territory rather than email-spam
+        # territory, hence a separate bucket from the request step.
         "password_reset_confirm": "10/hour",
+        # NOTE on the two rates below: both endpoints are reachable without
+        # authentication, so ScopedRateThrottle keys them by IP address —
+        # and a whole nursing cohort on campus wifi or a hospital network
+        # shares ONE public IP. A limit tuned to a single student would
+        # therefore lock out an entire class. Both are deliberately set
+        # per-cohort rather than per-person for that reason.
+        #
+        # Verification links are signed with SECRET_KEY and are not
+        # realistically guessable, so this is a backstop against blind
+        # hammering rather than a defence against a credible attack.
+        "verify_email": "100/hour",
+        # A refresh token is itself a strong, single-use credential
+        # (rotation + blacklisting are on), so brute force is not the threat
+        # here; this exists to bound runaway automated abuse. One student
+        # refreshing a 30-minute access token generates ~2/hour, so this
+        # accommodates a large shared-IP cohort with room to spare.
+        "token_refresh": "1000/hour",
+        # --- Requires a valid access token ---
+        # Grading reveals the per-choice answer key, so this bounds how fast
+        # one account can harvest it (see QuestionSubmitView's docstring).
+        # Set well above what a real quiz-taker generates.
+        "question_submit": "300/hour",
+        # Feedback/issue reports accept free text, so an unbounded rate is a
+        # cheap way to fill the database.
+        "feedback": "20/hour",
     },
 }
-
-# Imported here rather than at the top of the file: timedelta is only
-# needed for the SIMPLE_JWT block immediately below, and keeping it local
-# to where it's used avoids polluting the module namespace / `from .base
-# import *` wildcard imports in local.py and production.py with an unrelated
-# stdlib symbol. The `# noqa: E402` silences the "import not at top of file"
-# lint warning this deliberately triggers.
-from datetime import timedelta  # noqa: E402
 
 # djangorestframework-simplejwt configuration — see
 # apps/accounts/views.py (LoginView, LogoutView) for how rotation and
 # blacklisting are actually exercised.
 SIMPLE_JWT = {
-    "ACCESS_TOKEN_LIFETIME": timedelta(minutes=30),  # short-lived; sent on every API request, so a leaked access token is only useful for 30 minutes
-    "REFRESH_TOKEN_LIFETIME": timedelta(days=14),  # long-lived; stored client-side to silently obtain new access tokens without re-login ("stay logged in" for 2 weeks)
-    "ROTATE_REFRESH_TOKENS": True,  # every refresh call issues a brand-new refresh token instead of reusing the same one — limits how long a stolen refresh token stays valid
-    "BLACKLIST_AFTER_ROTATION": True,  # the old refresh token is invalidated the moment it's used to rotate — requires the token_blacklist app (INSTALLED_APPS above) to store the blacklist; also what makes logout actually revoke a refresh token rather than just discarding it client-side
+    # Short-lived; sent on every API request, so a leaked access token is
+    # only useful for 30 minutes.
+    "ACCESS_TOKEN_LIFETIME": timedelta(minutes=30),
+    # Long-lived; stored client-side to silently obtain new access tokens
+    # without re-login ("stay logged in" for 2 weeks).
+    "REFRESH_TOKEN_LIFETIME": timedelta(days=14),
+    # Every refresh call issues a brand-new refresh token instead of reusing
+    # the same one — limits how long a stolen refresh token stays valid.
+    "ROTATE_REFRESH_TOKENS": True,
+    # The old refresh token is invalidated the moment it's used to rotate —
+    # requires the token_blacklist app (INSTALLED_APPS above) to store the
+    # blacklist. This is also what lets logout and password reset actually
+    # revoke tokens rather than just discarding them client-side.
+    "BLACKLIST_AFTER_ROTATION": True,
 }
 
 
@@ -230,9 +372,9 @@ SIMPLE_JWT = {
 # A separate, explicit list rather than just [FRONTEND_URL]: FRONTEND_URL
 # is the one canonical URL used to build email links, but CORS sometimes
 # needs to trust more than one origin at once — e.g. both a custom domain
-# and the original *.onrender.com URL during DNS cutover, so the site
-# doesn't break for anyone still on the old link while DNS propagates.
-# Defaults to just FRONTEND_URL when this isn't set separately.
+# and the original *.onrender.com URL during DNS cutover, or both the apex
+# domain and its www. subdomain, so the site doesn't break for anyone
+# arriving on the other one. Defaults to just FRONTEND_URL when unset.
 CORS_ALLOWED_ORIGINS = env.list("CORS_ALLOWED_ORIGINS", default=[FRONTEND_URL])
 
 
@@ -249,3 +391,46 @@ ANYMAIL = {
 # apps/payments/views.py actually processes events instead of just
 # returning 200. Blank default so Phase 1 never needs a real Stripe account.
 STRIPE_WEBHOOK_SECRET = env("STRIPE_WEBHOOK_SECRET", default="")
+
+
+# Logging
+#
+# Without an explicit config, Django's default sends nothing to stdout when
+# DEBUG=False, which would make the deliberate swallow-and-log failure
+# handling in apps/accounts/emails.py invisible in production: a
+# misconfigured or down email provider would look exactly like a working
+# one. Render captures a service's stdout/stderr as its logs, so writing to
+# the console is all that is needed for these to be visible in the Render
+# dashboard.
+LOGGING = {
+    "version": 1,
+    # Django installs its own default handlers before this dict is applied;
+    # keeping them would double up every record.
+    "disable_existing_loggers": False,
+    "formatters": {
+        "standard": {
+            "format": "{asctime} {levelname} {name} {message}",
+            "style": "{",
+        },
+    },
+    "handlers": {
+        "console": {
+            "class": "logging.StreamHandler",
+            "formatter": "standard",
+        },
+    },
+    "root": {
+        "handlers": ["console"],
+        "level": env("LOG_LEVEL", default="INFO"),
+    },
+    "loggers": {
+        # Django's own logger, including the "django.request" records that
+        # carry 4xx/5xx tracebacks. propagate=False stops each record being
+        # handled twice (once here, once by root).
+        "django": {
+            "handlers": ["console"],
+            "level": env("DJANGO_LOG_LEVEL", default="INFO"),
+            "propagate": False,
+        },
+    },
+}

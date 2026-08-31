@@ -1,4 +1,5 @@
 from django.contrib import admin
+
 # Django's ready-made admin page for user management (list view, detail
 # view with fieldsets, add-user flow) — subclassed below rather than
 # reimplemented, since it already handles password hashing display,
@@ -19,7 +20,9 @@ class UserAdmin(BaseUserAdmin):
     form = UserChangeForm
     model = User
 
-    ordering = ("email",)  # BaseUserAdmin defaults to ordering by username, which doesn't exist on this model — email is the closest equivalent identifier
+    ordering = (
+        "email",
+    )  # BaseUserAdmin defaults to ordering by username, which doesn't exist on this model — email is the closest equivalent identifier
     list_display = ("email", "full_name", "is_active", "is_staff", "subscription_status", "date_joined")
     list_filter = ("is_active", "is_staff", "subscription_status")
     search_fields = ("email", "full_name")

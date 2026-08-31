@@ -38,7 +38,9 @@ class RecommendLikelihood(models.TextChoices):
 class QuizFeedback(UUIDPKMixin, models.Model):
     """One student's end-of-quiz survey response."""
 
-    student = models.ForeignKey(settings.AUTH_USER_MODEL, on_delete=models.CASCADE, related_name="quiz_feedback")
+    student = models.ForeignKey(
+        settings.AUTH_USER_MODEL, on_delete=models.CASCADE, related_name="quiz_feedback"
+    )
     # Nullable: the quiz-taking flow is still mock-only on the frontend
     # (no QuizSession row exists yet for a mock session), so this stays
     # empty until Milestone 3's real quiz engine creates real sessions to

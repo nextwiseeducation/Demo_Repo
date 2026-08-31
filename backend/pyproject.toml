@@ -1,0 +1,59 @@
+# Tooling config for the backend. There is no build/packaging section here
+# on purpose — this is a Django application deployed from source (see
+# render.yaml), not a distributable package, so this file exists solely to
+# give ruff a single, checked-in definition of "correctly formatted" that
+# every contributor and CI run shares.
+
+[tool.ruff]
+line-length = 110
+target-version = "py313"
+# Generated migration files are Django's output, not hand-written code —
+# reformatting them creates noisy diffs and risks touching a file that must
+# stay byte-stable against what makemigrations would regenerate.
+extend-exclude = [".venv", "*/migrations/*"]
+
+[tool.ruff.lint]
+select = [
+    "E",    # pycodestyle errors
+    "F",    # pyflakes (undefined names, unused imports)
+    "I",    # isort — import ordering
+    "UP",   # pyupgrade — modern Python idioms
+    "B",    # flake8-bugbear — likely bugs
+    "DJ",   # flake8-django — Django-specific footguns
+]
+ignore = [
+    # This codebase deliberately carries long explanatory comments (see
+    # CLAUDE.md: "the client will eventually manage this platform
+    # independently, so code must be readable and well-commented"). Comment
+    # lines are exempt from the length limit; code lines are not, which
+    # ruff format enforces on its own.
+    "E501",
+    # DJ001 objects to null=True on CharField/TextField. Django's convention
+    # is that "no value" for a string is "", and for most fields that is
+    # right — but every nullable string field in this project is a
+    # deliberate exception, so enforcing the rule here would mean rewriting
+    # model semantics (and running data migrations) to satisfy a style
+    # check:
+    #   - Question.external_id NEEDS null, not "": it is unique, and
+    #     Postgres treats NULLs as distinct. With "" as the empty value,
+    #     the second hand-authored question without an upstream id would
+    #     collide with the first.
+    #   - Question.rationale_correct / rationale_incorrect / reference /
+    #     key_takeaway and User.disclaimer_version / terms_version are
+    #     genuinely tri-state: "never recorded" is a different fact from
+    #     "recorded as empty", and the audit trail fields in particular are
+    #     legal records where that distinction matters.
+    "DJ001",
+]
+
+[tool.ruff.lint.per-file-ignores]
+# Settings modules intentionally use `from .base import *` to inherit every
+# base setting and override only what differs per environment.
+"config/settings/local.py" = ["F403", "F405"]
+"config/settings/production.py" = ["F403", "F405"]
+
+[tool.ruff.format]
+quote-style = "double"
+
+[tool.ruff.lint.isort]
+known-first-party = ["apps", "config"]

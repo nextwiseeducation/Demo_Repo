@@ -59,7 +59,17 @@ class Topic(models.Model):
         # to be unique WITHIN a given system — "Assessment" could
         # legitimately exist as a topic under both Cardiovascular and
         # Respiratory.
-        unique_together = ("nursing_system", "name")
+        #
+        # Expressed as a UniqueConstraint rather than the older
+        # unique_together, which current Django steers away from: a named
+        # constraint is what appears in database errors and in future
+        # migrations, and the constraints API additionally supports
+        # conditional and expression-based rules if this ever needs to grow.
+        constraints = [
+            models.UniqueConstraint(
+                fields=["nursing_system", "name"], name="unique_topic_name_per_nursing_system"
+            )
+        ]
 
     def __str__(self):
         # "System / Topic" format makes this topic identifiable on its own
@@ -76,7 +86,9 @@ class Subtopic(models.Model):
         ordering = ["topic__name", "name"]
         # Same reasoning as Topic above, one level deeper: unique within
         # its parent Topic, not globally.
-        unique_together = ("topic", "name")
+        constraints = [
+            models.UniqueConstraint(fields=["topic", "name"], name="unique_subtopic_name_per_topic")
+        ]
 
     def __str__(self):
         # __str__ on Topic already includes the system name, so this ends
@@ -114,7 +126,11 @@ class ClientNeedsCategory(models.Model):
         verbose_name_plural = "Client Needs categories"
         # The actual "RN and PN can reuse the same category name" rule,
         # enforced at the database level, not just convention.
-        unique_together = ("name", "exam_type")
+        constraints = [
+            models.UniqueConstraint(
+                fields=["name", "exam_type"], name="unique_client_needs_category_per_exam_type"
+            )
+        ]
         ordering = ["exam_type", "name"]
 
     def __str__(self):
@@ -130,7 +146,11 @@ class ClientNeedsSubcategory(models.Model):
         # Unique within its parent category (which itself is already
         # unique per exam type), so this transitively also can't collide
         # across RN/PN.
-        unique_together = ("category", "name")
+        constraints = [
+            models.UniqueConstraint(
+                fields=["category", "name"], name="unique_client_needs_subcategory_per_category"
+            )
+        ]
         ordering = ["category__name", "name"]
 
     def __str__(self):
