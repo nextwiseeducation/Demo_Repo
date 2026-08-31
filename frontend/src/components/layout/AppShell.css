@@ -36,6 +36,10 @@
 .nw-app .avatar{ display: flex; align-items: center; justify-content: center; width: 36px; height: 36px; border-radius: 999px; background: var(--secondary); color: var(--secondary-fg); }
 .nw-app main{ flex: 1; padding: 44px 24px 88px; }
 .nw-app .page{ max-width: 672px; margin: 0 auto; display: flex; flex-direction: column; gap: 24px; }
+  /* Quiz session page only — wider than .page's default so a Matrix table
+     or multi-column Bow-Tie/Drag-Drop layout has room without its own
+     horizontal scrollbar on common desktop widths. */
+  .nw-app .page-wide{ max-width: 860px; }
 .nw-app .card{ border-radius: var(--r-xl); background: var(--card); border: 1px solid var(--border); box-shadow: var(--shadow-card); }
 .nw-app .btn-primary{
     display: inline-flex; align-items: center; justify-content: center; height: 36px; padding: 0 22px;

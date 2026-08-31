@@ -43,7 +43,13 @@ export function QuizSessionPage() {
   return <QuizSessionInner quizSession={state.session} />;
 }
 
-/** Whether `answer` has anything worth submitting, for the given question's effective type — gates the Submit button. */
+/**
+ * Whether `answer` is complete enough to submit, for the given question's
+ * effective type — gates the Submit button. Matrix and Cloze require every
+ * row/blank to be answered (a partial grid or sentence isn't a real
+ * attempt); the others only require at least one selection, matching
+ * MCQ/SATA's existing "something is selected" bar.
+ */
 function hasAnswer(question: Question, answer: AnswerState | undefined): boolean {
   if (!answer) return false;
   const type = effectiveQuestionType(question);
@@ -53,15 +59,46 @@ function hasAnswer(question: Question, answer: AnswerState | undefined): boolean
   if (!sa) return false;
   switch (sa.kind) {
     case "MATRIX":
-      return sa.selections.length > 0;
+      return question.matrix_rows.every((row) => sa.selections.some((s) => s.row_id === row.id));
     case "BOWTIE":
       return sa.selectedOptionIds.length > 0;
     case "CLOZE":
-      return sa.selections.length > 0;
+      return question.cloze_blanks.every((blank) => sa.selections.some((s) => s.blank_id === blank.id));
     case "DRAG_DROP":
       return sa.placements.length > 0;
     case "HOTSPOT":
       return sa.selectedTargetIds.length > 0;
+    default:
+      return false;
+  }
+}
+
+/**
+ * Whether this question actually has answer data to render, for its
+ * effective type — false for a question whose type is fully supported but
+ * whose own content is incomplete (e.g. an NGN Case Study item authored
+ * with its options as inline stem text rather than structured choices; see
+ * import_ngn_item_bank.py's "KNOWN LIMITATION" docstring). Gates isSupported
+ * below so that case lands on the skippable notice instead of an
+ * interactive-looking component with nothing in it and a Submit button that
+ * can never become enabled.
+ */
+function hasRenderableData(question: Question): boolean {
+  switch (effectiveQuestionType(question)) {
+    case "MCQ":
+    case "SATA":
+    case "EMR":
+      return question.answer_choices.length > 0;
+    case "MATRIX":
+      return question.matrix_rows.length > 0 && question.matrix_columns.length > 0;
+    case "BOWTIE":
+      return question.bowtie_options.length > 0;
+    case "CLOZE":
+      return question.cloze_blanks.length > 0;
+    case "DRAG_DROP":
+      return question.dragdrop_items.length > 0;
+    case "HOTSPOT":
+      return question.hotspot_targets.length > 0;
     default:
       return false;
   }
@@ -114,7 +151,8 @@ function QuizSessionInner({ quizSession }: { quizSession: QuizSessionData }) {
   const structuredAnswer = answer?.structuredAnswer;
   const isLastQuestion = session.currentIndex === session.questions.length - 1;
   const effectiveType = effectiveQuestionType(question);
-  const isSupported = SUPPORTED_QUESTION_TYPES.includes(effectiveType);
+  const isTypeSupported = SUPPORTED_QUESTION_TYPES.includes(effectiveType);
+  const isSupported = isTypeSupported && hasRenderableData(question);
   const isMarked = session.markedIds.has(question.id);
   // Test Mode's Tutor toggle (quiz-setup page) — when off, the correct
   // answer/rationale bar stays hidden after each question, matching
@@ -296,7 +334,7 @@ function QuizSessionInner({ quizSession }: { quizSession: QuizSessionData }) {
   }
 
   return (
-    <div className="page">
+    <div className="page page-wide">
       <div className="flex items-center justify-between gap-3">
         <QuizProgressBar currentIndex={session.currentIndex} total={session.questions.length} question={question} />
         <Button
@@ -312,11 +350,20 @@ function QuizSessionInner({ quizSession }: { quizSession: QuizSessionData }) {
       </div>
 
       {isSupported ? (
-        <QuestionCard question={question} questionNumber={session.currentIndex + 1} hideStem={effectiveType === "HOTSPOT"}>
+        <QuestionCard
+          question={question}
+          questionNumber={session.currentIndex + 1}
+          hideStem={effectiveType === "HOTSPOT" || effectiveType === "CLOZE"}
+          hideScenario={effectiveType === "HOTSPOT"}
+        >
           {renderQuestionBody()}
         </QuestionCard>
       ) : (
-        <UnsupportedQuestionTypeNotice questionType={effectiveType} onSkip={goNextOrFinish} />
+        <UnsupportedQuestionTypeNotice
+          questionType={effectiveType}
+          onSkip={goNextOrFinish}
+          reason={isTypeSupported ? "MISSING_CONTENT" : "TYPE_NOT_SUPPORTED"}
+        />
       )}
 
       {isSupported && submitted && showFeedbackBar && (

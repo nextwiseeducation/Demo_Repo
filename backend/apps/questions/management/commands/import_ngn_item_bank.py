@@ -450,6 +450,32 @@ class Command(BaseCommand):
             raise RowError(f"{label}: {self._format_validation_error(exc)}") from exc
         question.save()
 
+        # Opt-in: if the author has since added real Answer_Options rows for
+        # this case item (keyed by its external_id, same as a top-level
+        # question), sync them the same way _import_question_row does —
+        # this is what upgrades a case-study sub-item from reference-only
+        # content to something a student can actually answer and have
+        # graded. Left un-synced (no RowError) when no rows are provided,
+        # preserving this command's original "reference/context only"
+        # default described in its own docstring above.
+        options = sheets["answer_options"].get(external_id, [])
+        if options:
+            if ngn_type in (QuestionType.MCQ, QuestionType.SATA, QuestionType.EMR):
+                self._sync_answer_choices(question, options)
+            elif ngn_type == QuestionType.MATRIX:
+                self._sync_matrix(question, options)
+            elif ngn_type == QuestionType.BOWTIE:
+                self._sync_bowtie(question, options)
+            elif ngn_type == QuestionType.DRAG_DROP:
+                if item_type_raw == "Drag-and-Drop (Sequencing)":
+                    self._sync_dragdrop_sequence(question, options)
+                else:
+                    self._sync_dragdrop_category(question, options)
+            elif ngn_type == QuestionType.CLOZE:
+                self._sync_cloze(question, options)
+            elif ngn_type == QuestionType.HOTSPOT:
+                self._sync_hotspot(question, options)
+
         return "updated" if existing else "created"
 
     # --- Taxonomy resolution (shared by both paths above) -----------------
@@ -679,7 +705,13 @@ class Command(BaseCommand):
     def _sync_hotspot(question, options):
         if not options:
             raise RowError("no Answer_Options rows for this Hot Spot question")
-        haystack = (question.stem or "") + "\n" + (question.clinical_scenario or "")
+        # A case-study item's own clinical_scenario is often just a short
+        # hour label (e.g. "(Admission data, Hour 0)") — the actual passage
+        # a Hot Spot item highlights within lives on the shared case, not
+        # the item itself (Question.case_study's own comment). Both are
+        # searched so a target can come from either.
+        case_scenario = question.case_study.shared_scenario if question.case_study_id else ""
+        haystack = (question.stem or "") + "\n" + (question.clinical_scenario or "") + "\n" + (case_scenario or "")
         question.hotspot_targets.all().delete()
         for i, opt in enumerate(options):
             target_text = opt.get("Option_Text") or ""
