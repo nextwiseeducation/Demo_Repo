@@ -8,7 +8,22 @@ from rest_framework.throttling import ScopedRateThrottle
 from rest_framework.views import APIView
 
 from apps.questions.models import Question, QuestionType
-from apps.questions.services import QuestionNotGradeable, build_answer_key, grade_submission
+from apps.questions.services import (
+    QuestionNotGradeable,
+    build_answer_key,
+    build_bowtie_answer_key,
+    build_cloze_answer_key,
+    build_dragdrop_answer_key,
+    build_hotspot_answer_key,
+    build_matrix_answer_key,
+    effective_question_type,
+    grade_bowtie,
+    grade_cloze,
+    grade_dragdrop,
+    grade_hotspot,
+    grade_matrix,
+    grade_submission,
+)
 
 from .models import Bookmark, QuizSession, QuizSessionQuestion, StudentResponseLog
 from .serializers import (
@@ -90,10 +105,50 @@ class QuizAnswerSubmitView(APIView):
         session_question = get_object_or_404(
             QuizSessionQuestion, quiz_session=session, question_id=data["question_id"]
         )
-        question = Question.objects.prefetch_related("answer_choices").get(pk=data["question_id"])
+        question = (
+            Question.objects.prefetch_related(
+                "answer_choices",
+                "matrix_rows",
+                "matrix_columns",
+                "bowtie_options",
+                "cloze_blanks__options",
+                "dragdrop_items",
+                "dragdrop_categories",
+                "hotspot_targets",
+            )
+            .get(pk=data["question_id"])
+        )
+
+        # Which family of question this actually is — for an NGN_CASE item
+        # that's ngn_type, not question_type itself (see
+        # effective_question_type's own docstring).
+        q_type = effective_question_type(question)
 
         try:
-            graded = grade_submission(question, data["selected_choice_ids"])
+            if q_type in (QuestionType.MCQ, QuestionType.SATA, QuestionType.EMR):
+                if not data["selected_choice_ids"]:
+                    return Response({"detail": "selected_choice_ids is required for this question type."}, status=status.HTTP_400_BAD_REQUEST)
+                graded = grade_submission(question, data["selected_choice_ids"])
+                is_correct, response_body = graded.is_correct, {"choices": build_answer_key(question)}
+            elif q_type == QuestionType.MATRIX:
+                graded = grade_matrix(question, data["matrix_selections"])
+                is_correct, response_body = graded.is_correct, {"matrix_cells": build_matrix_answer_key(question)}
+            elif q_type == QuestionType.BOWTIE:
+                graded = grade_bowtie(question, data["bowtie_option_ids"])
+                is_correct, response_body = graded.is_correct, {"bowtie_options": build_bowtie_answer_key(question)}
+            elif q_type == QuestionType.CLOZE:
+                graded = grade_cloze(question, data["cloze_selections"])
+                is_correct, response_body = graded.is_correct, {"cloze_blanks": build_cloze_answer_key(question)}
+            elif q_type == QuestionType.DRAG_DROP:
+                graded = grade_dragdrop(question, data["dragdrop_placements"])
+                is_correct, response_body = graded.is_correct, {"dragdrop_items": build_dragdrop_answer_key(question)}
+            elif q_type == QuestionType.HOTSPOT:
+                graded = grade_hotspot(question, data["hotspot_target_ids"])
+                is_correct, response_body = graded.is_correct, {"hotspot_targets": build_hotspot_answer_key(question)}
+            else:
+                return Response(
+                    {"detail": f"Question type {q_type} is not gradeable yet."}, status=status.HTTP_409_CONFLICT
+                )
         except QuestionNotGradeable:
             return Response(
                 {"detail": "This question is not available for grading."}, status=status.HTTP_409_CONFLICT
@@ -103,16 +158,20 @@ class QuizAnswerSubmitView(APIView):
             student=request.user,
             question=question,
             quiz_session=session,
-            is_correct=graded.is_correct,
+            is_correct=is_correct,
             time_taken_seconds=data["time_taken_seconds"],
         )
-        if question.question_type == QuestionType.SATA:
-            log.selected_choices.set(graded.selected_ids)
-        elif graded.selected_ids:
-            # MCQ/EMR-as-single: exactly one id expected; grade_submission
-            # already discarded anything not a real choice of this question.
-            log.selected_choice_id = next(iter(graded.selected_ids))
-            log.save(update_fields=["selected_choice"])
+        if q_type in (QuestionType.MCQ, QuestionType.SATA, QuestionType.EMR):
+            if q_type == QuestionType.SATA:
+                log.selected_choices.set(graded.selected_ids)
+            elif graded.selected_ids:
+                # MCQ/EMR-as-single: exactly one id expected; grade_submission
+                # already discarded anything not a real choice of this question.
+                log.selected_choice_id = next(iter(graded.selected_ids))
+                log.save(update_fields=["selected_choice"])
+        else:
+            log.selected_payload = graded.detail
+            log.save(update_fields=["selected_payload"])
 
         # max(), not a flat overwrite: re-answering an earlier question
         # (student navigates back) must not move progress backwards.
@@ -123,7 +182,7 @@ class QuizAnswerSubmitView(APIView):
             session.completed_at = timezone.now()
         session.save(update_fields=["current_question_index", "is_complete", "completed_at"])
 
-        return Response({"is_correct": graded.is_correct, "choices": build_answer_key(question)})
+        return Response({"is_correct": is_correct, **response_body})
 
 
 class QuizFacetCountsView(APIView):

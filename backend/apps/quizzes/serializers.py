@@ -44,18 +44,75 @@ class QuizSessionSerializer(serializers.ModelSerializer):
         fields = ["id", "current_question_index", "is_complete", "started_at", "filter_config", "questions"]
 
     def get_questions(self, obj: QuizSession):
-        ordered = Question.objects.filter(session_questions__quiz_session=obj).order_by(
-            "session_questions__position"
+        ordered = (
+            Question.objects.filter(session_questions__quiz_session=obj)
+            .select_related("domain", "nursing_system", "topic", "nclex_client_needs_category", "nclex_client_needs_subcategory", "case_study")
+            .prefetch_related(
+                "answer_choices",
+                "matrix_rows",
+                "matrix_columns",
+                "bowtie_options",
+                "cloze_blanks__options",
+                "dragdrop_items",
+                "dragdrop_categories",
+                "hotspot_targets",
+            )
+            .order_by("session_questions__position")
         )
         return QuestionListSerializer(ordered, many=True, context=self.context).data
 
 
 class QuizAnswerSubmitSerializer(serializers.Serializer):
-    """Validates the body of POST /api/quizzes/sessions/<id>/answers/."""
+    """
+    Validates the body of POST /api/quizzes/sessions/<id>/answers/.
+
+    Exactly one of the answer fields below must be non-empty, matching
+    which family question.question_type (or, for an NGN_CASE item,
+    ngn_type) belongs to — see apps.questions.services.effective_question_type
+    and QuizAnswerSubmitView, which is what actually dispatches on it.
+    selected_choice_ids stays required=False (it used to be allow_empty=False
+    and mandatory) because it is now only one of several possible answer
+    shapes, not the only one.
+    """
 
     question_id = serializers.UUIDField()
-    selected_choice_ids = serializers.ListField(child=serializers.UUIDField(), allow_empty=False)
+    # MCQ / SATA / EMR — existing shape, unchanged.
+    selected_choice_ids = serializers.ListField(child=serializers.UUIDField(), required=False, default=list)
+    # MATRIX — one column chosen per row.
+    matrix_selections = serializers.ListField(
+        child=serializers.DictField(child=serializers.IntegerField()), required=False, default=list
+    )
+    # BOWTIE — flat list of chosen BowTieOption ids across all three sections.
+    bowtie_option_ids = serializers.ListField(child=serializers.IntegerField(), required=False, default=list)
+    # CLOZE — one option chosen per dropdown blank.
+    cloze_selections = serializers.ListField(
+        child=serializers.DictField(child=serializers.IntegerField()), required=False, default=list
+    )
+    # DRAG_DROP — each item's final category and/or sequence position.
+    dragdrop_placements = serializers.ListField(
+        child=serializers.DictField(child=serializers.IntegerField(allow_null=True), allow_null=True),
+        required=False,
+        default=list,
+    )
+    # HOTSPOT — flat list of selected HotSpotTarget ids.
+    hotspot_target_ids = serializers.ListField(child=serializers.IntegerField(), required=False, default=list)
     time_taken_seconds = serializers.IntegerField(required=False, default=0, min_value=0)
+
+    def validate(self, attrs):
+        # Same access-control reasoning as QuestionSubmitSerializer's
+        # allow_empty=False: an entirely empty submission must not be
+        # gradeable, since grading is what reveals the answer key.
+        answer_fields = [
+            "selected_choice_ids",
+            "matrix_selections",
+            "bowtie_option_ids",
+            "cloze_selections",
+            "dragdrop_placements",
+            "hotspot_target_ids",
+        ]
+        if not any(attrs.get(field) for field in answer_fields):
+            raise serializers.ValidationError("At least one answer field must be non-empty.")
+        return attrs
 
 
 class BookmarkToggleSerializer(serializers.Serializer):

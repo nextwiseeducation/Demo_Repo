@@ -23,7 +23,7 @@ the rules can be unit-tested against plain data with no ORM instance at all.
 from dataclasses import dataclass
 from uuid import UUID
 
-from .models import AnswerChoice, Question
+from .models import AnswerChoice, MatrixCell, Question, QuestionType
 
 
 class QuestionNotGradeable(Exception):
@@ -139,3 +139,217 @@ def build_answer_key(question: Question) -> list[dict]:
 def choices_for(question: Question) -> list[AnswerChoice]:
     """Convenience accessor kept next to the rules that consume it."""
     return list(question.answer_choices.all())
+
+
+def effective_question_type(question: Question) -> str:
+    """
+    The type that decides how a question is rendered and graded.
+
+    For every question except NGN_CASE this is just question_type. An
+    NGN_CASE item's own question_type is the wrapper flag "this is a case
+    study item"; ngn_type says which real type (MCQ, MATRIX, BOWTIE, ...) it
+    actually is, per Question.ngn_type's docstring. Falls back to
+    question_type itself if ngn_type was left blank on a NGN_CASE row (a
+    content bug, not something grading should crash on).
+    """
+    if question.question_type == QuestionType.NGN_CASE and question.ngn_type:
+        return question.ngn_type
+    return question.question_type
+
+
+@dataclass(frozen=True)
+class GradedResult:
+    """
+    Generic grading outcome for the NGN types below — unlike GradedAnswer
+    (AnswerChoice-specific: a set of UUIDs), each of these submissions has
+    its own shape, so `detail` carries whatever that type needs persisted
+    (StudentResponseLog.selected_payload) rather than forcing every type
+    into the same fields.
+    """
+
+    is_correct: bool
+    detail: dict
+
+
+def _coerce_ints(values) -> set[int]:
+    """Same defensive role as _coerce_uuids, for the NGN stub models below, which use plain integer PKs (see MatrixRow/BowTieOption/etc.'s own 'no UUIDPKMixin' comments)."""
+    coerced: set[int] = set()
+    for value in values:
+        try:
+            coerced.add(int(value))
+        except (TypeError, ValueError):
+            continue
+    return coerced
+
+
+def grade_matrix(question: Question, matrix_selections) -> GradedResult:
+    """
+    matrix_selections: [{"row_id": int, "column_id": int}, ...] — the
+    column the student picked for each row (single-select per row, the
+    standard NGN Matrix/Grid format).
+
+    Correct only if every row that has a designated correct column was
+    answered with one of its correct columns. A row with no correct cell at
+    all raises QuestionNotGradeable, same reasoning as grade_submission: an
+    unanswerable row must never silently compare as satisfied.
+    """
+    rows = list(question.matrix_rows.all())
+    if not rows:
+        raise QuestionNotGradeable(f"Question {question.pk} has no matrix rows and cannot be graded.")
+
+    correct_by_row: dict[int, set[int]] = {}
+    for cell in MatrixCell.objects.filter(row__question=question, is_correct=True).values_list(
+        "row_id", "column_id"
+    ):
+        correct_by_row.setdefault(cell[0], set()).add(cell[1])
+
+    if any(row.id not in correct_by_row for row in rows):
+        raise QuestionNotGradeable(f"Question {question.pk} has a matrix row with no correct column and cannot be graded.")
+
+    selected_by_row: dict[int, int] = {}
+    for selection in matrix_selections:
+        row_id = _coerce_ints([selection.get("row_id")])
+        column_id = _coerce_ints([selection.get("column_id")])
+        if row_id and column_id:
+            selected_by_row[next(iter(row_id))] = next(iter(column_id))
+
+    is_correct = all(selected_by_row.get(row.id) in correct_by_row[row.id] for row in rows)
+    return GradedResult(is_correct=is_correct, detail={"selected_by_row": selected_by_row})
+
+
+def grade_bowtie(question: Question, bowtie_option_ids) -> GradedResult:
+    """
+    bowtie_option_ids: flat list of BowTieOption ids selected across all
+    three sections (Assessment/Condition/Action) — each option already
+    knows its own section, so grading is exact-set-match against every
+    option flagged is_correct, the same rule grade_submission uses for
+    AnswerChoice, just generalised to this model.
+    """
+    options = list(question.bowtie_options.all())
+    valid_ids = {option.id for option in options}
+    correct_ids = {option.id for option in options if option.is_correct}
+    if not correct_ids:
+        raise QuestionNotGradeable(f"Question {question.pk} has no correct bow-tie option and cannot be graded.")
+
+    selected_ids = _coerce_ints(bowtie_option_ids) & valid_ids
+    return GradedResult(is_correct=selected_ids == correct_ids, detail={"selected_option_ids": sorted(selected_ids)})
+
+
+def grade_cloze(question: Question, cloze_selections) -> GradedResult:
+    """cloze_selections: [{"blank_id": int, "option_id": int}, ...] — one chosen option per dropdown blank."""
+    blanks = list(question.cloze_blanks.prefetch_related("options").all())
+    if not blanks:
+        raise QuestionNotGradeable(f"Question {question.pk} has no cloze blanks and cannot be graded.")
+
+    correct_by_blank: dict[int, int] = {}
+    for blank in blanks:
+        correct_option = next((o for o in blank.options.all() if o.is_correct), None)
+        if correct_option is None:
+            raise QuestionNotGradeable(f"Cloze blank {blank.pk} has no correct option and cannot be graded.")
+        correct_by_blank[blank.id] = correct_option.id
+
+    selected_by_blank: dict[int, int] = {}
+    for selection in cloze_selections:
+        blank_id = _coerce_ints([selection.get("blank_id")])
+        option_id = _coerce_ints([selection.get("option_id")])
+        if blank_id and option_id:
+            selected_by_blank[next(iter(blank_id))] = next(iter(option_id))
+
+    is_correct = all(selected_by_blank.get(blank_id) == correct for blank_id, correct in correct_by_blank.items())
+    return GradedResult(is_correct=is_correct, detail={"selected_by_blank": selected_by_blank})
+
+
+def grade_dragdrop(question: Question, dragdrop_placements) -> GradedResult:
+    """
+    dragdrop_placements: [{"item_id": int, "category_id": int|None, "order": int|None}, ...].
+
+    Covers both DragDropItem variants (see its own docstring): a question
+    is graded as "sort into categories" if its items carry correct_category,
+    or as "sequence" if they carry correct_order — whichever the content
+    was actually authored as.
+    """
+    items = list(question.dragdrop_items.all())
+    if not items:
+        raise QuestionNotGradeable(f"Question {question.pk} has no drag-drop items and cannot be graded.")
+
+    is_category_variant = any(item.correct_category_id is not None for item in items)
+    is_order_variant = any(item.correct_order is not None for item in items)
+    if not is_category_variant and not is_order_variant:
+        raise QuestionNotGradeable(f"Question {question.pk} has no drag-drop answer key and cannot be graded.")
+
+    placement_by_item: dict[int, dict] = {}
+    for placement in dragdrop_placements:
+        item_id = _coerce_ints([placement.get("item_id")])
+        if not item_id:
+            continue
+        placement_by_item[next(iter(item_id))] = placement
+
+    if is_category_variant:
+        is_correct = all(
+            _coerce_ints([placement_by_item.get(item.id, {}).get("category_id")]) == _coerce_ints([item.correct_category_id])
+            for item in items
+        )
+    else:
+        is_correct = all(
+            placement_by_item.get(item.id, {}).get("order") == item.correct_order for item in items
+        )
+
+    return GradedResult(is_correct=is_correct, detail={"placements": list(dragdrop_placements)})
+
+
+def grade_hotspot(question: Question, hotspot_target_ids) -> GradedResult:
+    """hotspot_target_ids: flat list of selected HotSpotTarget ids — exact-set-match against every target flagged is_correct."""
+    targets = list(question.hotspot_targets.all())
+    valid_ids = {target.id for target in targets}
+    correct_ids = {target.id for target in targets if target.is_correct}
+    if not correct_ids:
+        raise QuestionNotGradeable(f"Question {question.pk} has no correct hot spot target and cannot be graded.")
+
+    selected_ids = _coerce_ints(hotspot_target_ids) & valid_ids
+    return GradedResult(is_correct=selected_ids == correct_ids, detail={"selected_target_ids": sorted(selected_ids)})
+
+
+def build_matrix_answer_key(question: Question) -> list[dict]:
+    return [
+        {"row_id": cell.row_id, "column_id": cell.column_id, "is_correct": cell.is_correct, "rationale": cell.rationale}
+        for cell in MatrixCell.objects.filter(row__question=question).select_related("row", "column")
+    ]
+
+
+def build_bowtie_answer_key(question: Question) -> list[dict]:
+    return [
+        {"id": option.id, "is_correct": option.is_correct, "rationale": option.rationale}
+        for option in question.bowtie_options.all()
+    ]
+
+
+def build_cloze_answer_key(question: Question) -> list[dict]:
+    return [
+        {
+            "blank_id": blank.id,
+            "options": [
+                {"id": option.id, "is_correct": option.is_correct, "rationale": option.rationale}
+                for option in blank.options.all()
+            ],
+        }
+        for blank in question.cloze_blanks.prefetch_related("options").all()
+    ]
+
+
+def build_dragdrop_answer_key(question: Question) -> list[dict]:
+    return [
+        {
+            "id": item.id,
+            "correct_category_id": item.correct_category_id,
+            "correct_order": item.correct_order,
+            "rationale": item.rationale,
+        }
+        for item in question.dragdrop_items.all()
+    ]
+
+
+def build_hotspot_answer_key(question: Question) -> list[dict]:
+    return [
+        {"id": target.id, "is_correct": target.is_correct, "rationale": target.rationale}
+        for target in question.hotspot_targets.all()
+    ]

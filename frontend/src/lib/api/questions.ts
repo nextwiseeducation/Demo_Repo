@@ -63,7 +63,16 @@ export async function listQuestions(): Promise<Question[]> {
 
 export interface SubmitAnswerResult {
   is_correct: boolean;
-  choices: { id: string; is_correct: boolean; rationale: string }[];
+  // Exactly one of these is present, matching the question's effective type
+  // (see effectiveQuestionType) — the backend's QuizAnswerSubmitView/
+  // QuestionSubmitView return only the answer key for the type that was
+  // actually submitted.
+  choices?: { id: string; is_correct: boolean; rationale: string }[];
+  matrix_cells?: { row_id: number; column_id: number; is_correct: boolean; rationale: string }[];
+  bowtie_options?: { id: number; is_correct: boolean; rationale: string }[];
+  cloze_blanks?: { blank_id: number; options: { id: number; is_correct: boolean; rationale: string }[] }[];
+  dragdrop_items?: { id: number; correct_category_id: number | null; correct_order: number | null; rationale: string }[];
+  hotspot_targets?: { id: number; is_correct: boolean; rationale: string }[];
 }
 
 /**

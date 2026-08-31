@@ -43,8 +43,23 @@ export interface QuizSession {
   questions: Question[];
 }
 
+/**
+ * One question's in-progress answer, for the 5 NGN structural types that
+ * aren't AnswerChoice-based (MCQ/SATA/EMR keep using selected_choice_ids on
+ * QuestionResponse/AnswerState directly). Each variant is a full snapshot
+ * of that question's current answer.
+ */
+export type StructuredAnswer =
+  | { kind: "MATRIX"; selections: { row_id: number; column_id: number }[] }
+  | { kind: "BOWTIE"; selectedOptionIds: number[] }
+  | { kind: "CLOZE"; selections: { blank_id: number; option_id: number }[] }
+  | { kind: "DRAG_DROP"; placements: { item_id: number; category_id: number | null; order: number | null }[] }
+  | { kind: "HOTSPOT"; selectedTargetIds: number[] };
+
 export interface QuestionResponse {
   question_id: string;
   selected_choice_ids: string[];
+  /** Set only for the 5 NGN structural types — see StructuredAnswer. */
+  structured_answer?: StructuredAnswer;
   is_correct: boolean;
 }

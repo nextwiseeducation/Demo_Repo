@@ -30,8 +30,19 @@ class QuestionListView(generics.ListAPIView):
 
     queryset = (
         Question.objects.filter(is_active=True)
-        .select_related("domain", "nursing_system", "topic", "nclex_client_needs_category", "nclex_client_needs_subcategory")
-        .prefetch_related("answer_choices")
+        .select_related(
+            "domain", "nursing_system", "topic", "nclex_client_needs_category", "nclex_client_needs_subcategory", "case_study"
+        )
+        .prefetch_related(
+            "answer_choices",
+            "matrix_rows",
+            "matrix_columns",
+            "bowtie_options",
+            "cloze_blanks__options",
+            "dragdrop_items",
+            "dragdrop_categories",
+            "hotspot_targets",
+        )
     )
     serializer_class = QuestionListSerializer
 

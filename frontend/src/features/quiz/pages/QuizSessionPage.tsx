@@ -4,16 +4,23 @@ import { useEffect, useReducer, useRef } from "react";
 import { Navigate, useLocation, useNavigate } from "react-router-dom";
 
 import { Button } from "@/components/ui/button";
+import { BowTieQuestion } from "@/features/quiz/components/BowTieQuestion";
+import { ClozeQuestion } from "@/features/quiz/components/ClozeQuestion";
+import { DragDropQuestion, type DragDropPlacement } from "@/features/quiz/components/DragDropQuestion";
+import { EMRChoiceList } from "@/features/quiz/components/EMRChoiceList";
+import { HotSpotQuestion } from "@/features/quiz/components/HotSpotQuestion";
+import { MatrixQuestion } from "@/features/quiz/components/MatrixQuestion";
 import { MCQChoiceList } from "@/features/quiz/components/MCQChoiceList";
 import { QuestionCard } from "@/features/quiz/components/QuestionCard";
 import { QuestionFeedbackBar } from "@/features/quiz/components/QuestionFeedbackBar";
 import { QuizProgressBar } from "@/features/quiz/components/QuizProgressBar";
 import { SATAChoiceList } from "@/features/quiz/components/SATAChoiceList";
 import { UnsupportedQuestionTypeNotice } from "@/features/quiz/components/UnsupportedQuestionTypeNotice";
-import { createInitialState, quizSessionReducer } from "@/features/quiz/quizSessionReducer";
+import { createInitialState, quizSessionReducer, type AnswerState } from "@/features/quiz/quizSessionReducer";
 import * as quizzesApi from "@/lib/api/quizzes";
 import { ROUTES } from "@/lib/constants";
-import type { QuestionResponse, QuizSession as QuizSessionData } from "@/types/quiz";
+import { effectiveQuestionType, SUPPORTED_QUESTION_TYPES, type Question } from "@/types/question";
+import type { QuestionResponse, QuizSession as QuizSessionData, StructuredAnswer } from "@/types/quiz";
 
 interface LocationState {
   session: QuizSessionData;
@@ -34,6 +41,53 @@ export function QuizSessionPage() {
   }
 
   return <QuizSessionInner quizSession={state.session} />;
+}
+
+/** Whether `answer` has anything worth submitting, for the given question's effective type — gates the Submit button. */
+function hasAnswer(question: Question, answer: AnswerState | undefined): boolean {
+  if (!answer) return false;
+  const type = effectiveQuestionType(question);
+  if (type === "MCQ" || type === "SATA" || type === "EMR") return answer.selectedChoiceIds.length > 0;
+
+  const sa = answer.structuredAnswer;
+  if (!sa) return false;
+  switch (sa.kind) {
+    case "MATRIX":
+      return sa.selections.length > 0;
+    case "BOWTIE":
+      return sa.selectedOptionIds.length > 0;
+    case "CLOZE":
+      return sa.selections.length > 0;
+    case "DRAG_DROP":
+      return sa.placements.length > 0;
+    case "HOTSPOT":
+      return sa.selectedTargetIds.length > 0;
+    default:
+      return false;
+  }
+}
+
+/** Builds the one populated field submitSessionAnswer needs, from whichever answer shape this question's effective type uses. */
+function buildSubmitFields(question: Question, answer: AnswerState) {
+  const type = effectiveQuestionType(question);
+  if (type === "MCQ" || type === "SATA" || type === "EMR") {
+    return { selectedChoiceIds: answer.selectedChoiceIds };
+  }
+  const sa = answer.structuredAnswer;
+  switch (sa?.kind) {
+    case "MATRIX":
+      return { matrixSelections: sa.selections };
+    case "BOWTIE":
+      return { bowtieOptionIds: sa.selectedOptionIds };
+    case "CLOZE":
+      return { clozeSelections: sa.selections };
+    case "DRAG_DROP":
+      return { dragdropPlacements: sa.placements };
+    case "HOTSPOT":
+      return { hotspotTargetIds: sa.selectedTargetIds };
+    default:
+      return {};
+  }
 }
 
 function QuizSessionInner({ quizSession }: { quizSession: QuizSessionData }) {
@@ -57,8 +111,10 @@ function QuizSessionInner({ quizSession }: { quizSession: QuizSessionData }) {
   const answer = session.answers[question.id];
   const submitted = answer?.submitted ?? false;
   const selectedIds = answer?.selectedChoiceIds ?? [];
+  const structuredAnswer = answer?.structuredAnswer;
   const isLastQuestion = session.currentIndex === session.questions.length - 1;
-  const isSupported = question.question_type === "MCQ" || question.question_type === "SATA";
+  const effectiveType = effectiveQuestionType(question);
+  const isSupported = SUPPORTED_QUESTION_TYPES.includes(effectiveType);
   const isMarked = session.markedIds.has(question.id);
   // Test Mode's Tutor toggle (quiz-setup page) — when off, the correct
   // answer/rationale bar stays hidden after each question, matching
@@ -70,11 +126,11 @@ function QuizSessionInner({ quizSession }: { quizSession: QuizSessionData }) {
   }, [session.currentIndex]);
 
   const submitMutation = useMutation({
-    mutationFn: ({ questionId, selectedChoiceIds }: { questionId: string; selectedChoiceIds: string[] }) =>
+    mutationFn: ({ questionId, answer }: { questionId: string; answer: AnswerState }) =>
       quizzesApi.submitSessionAnswer(quizSession.id, {
         questionId,
-        selectedChoiceIds,
         timeTakenSeconds: questionTimeSpentRef.current,
+        ...buildSubmitFields(question, answer),
       }),
     onSuccess: (result, { questionId }) => dispatch({ type: "SUBMIT_RESULT", questionId, result }),
   });
@@ -103,6 +159,7 @@ function QuizSessionInner({ quizSession }: { quizSession: QuizSessionData }) {
         return {
           question_id: q.id,
           selected_choice_ids: a?.selectedChoiceIds ?? [],
+          structured_answer: a?.structuredAnswer,
           is_correct: a?.isCorrect ?? false,
         };
       });
@@ -113,6 +170,129 @@ function QuizSessionInner({ quizSession }: { quizSession: QuizSessionData }) {
       return;
     }
     dispatch({ type: "NEXT" });
+  }
+
+  function setStructuredAnswer(next: StructuredAnswer) {
+    dispatch({ type: "SET_STRUCTURED_ANSWER", questionId: question.id, answer: next });
+  }
+
+  function renderQuestionBody() {
+    switch (effectiveType) {
+      case "MCQ":
+        return (
+          <MCQChoiceList
+            choices={question.answer_choices}
+            selectedId={selectedIds[0] ?? null}
+            submitted={submitted}
+            onSelect={(choiceId) => dispatch({ type: "SELECT_SINGLE", questionId: question.id, choiceId })}
+          />
+        );
+      case "SATA":
+        return (
+          <SATAChoiceList
+            choices={question.answer_choices}
+            selectedIds={selectedIds}
+            submitted={submitted}
+            onToggle={(choiceId) => dispatch({ type: "TOGGLE_MULTI", questionId: question.id, choiceId })}
+          />
+        );
+      case "EMR":
+        return (
+          <EMRChoiceList
+            choices={question.answer_choices}
+            selectedIds={selectedIds}
+            submitted={submitted}
+            onToggle={(choiceId) => dispatch({ type: "TOGGLE_MULTI", questionId: question.id, choiceId })}
+          />
+        );
+      case "MATRIX": {
+        const selections = structuredAnswer?.kind === "MATRIX" ? structuredAnswer.selections : [];
+        return (
+          <MatrixQuestion
+            rows={question.matrix_rows}
+            columns={question.matrix_columns}
+            selections={selections}
+            submitted={submitted}
+            cellResults={question.matrix_cells}
+            onSelect={(rowId, columnId) =>
+              setStructuredAnswer({
+                kind: "MATRIX",
+                selections: [...selections.filter((s) => s.row_id !== rowId), { row_id: rowId, column_id: columnId }],
+              })
+            }
+          />
+        );
+      }
+      case "BOWTIE": {
+        const selectedOptionIds = structuredAnswer?.kind === "BOWTIE" ? structuredAnswer.selectedOptionIds : [];
+        return (
+          <BowTieQuestion
+            options={question.bowtie_options}
+            selectedOptionIds={selectedOptionIds}
+            submitted={submitted}
+            onToggle={(optionId) =>
+              setStructuredAnswer({
+                kind: "BOWTIE",
+                selectedOptionIds: selectedOptionIds.includes(optionId)
+                  ? selectedOptionIds.filter((id) => id !== optionId)
+                  : [...selectedOptionIds, optionId],
+              })
+            }
+          />
+        );
+      }
+      case "CLOZE": {
+        const selections = structuredAnswer?.kind === "CLOZE" ? structuredAnswer.selections : [];
+        return (
+          <ClozeQuestion
+            stem={question.stem}
+            blanks={question.cloze_blanks}
+            selections={selections}
+            submitted={submitted}
+            onSelect={(blankId, optionId) =>
+              setStructuredAnswer({
+                kind: "CLOZE",
+                selections: [...selections.filter((s) => s.blank_id !== blankId), { blank_id: blankId, option_id: optionId }],
+              })
+            }
+          />
+        );
+      }
+      case "DRAG_DROP": {
+        const placements: DragDropPlacement[] = structuredAnswer?.kind === "DRAG_DROP" ? structuredAnswer.placements : [];
+        return (
+          <DragDropQuestion
+            items={question.dragdrop_items}
+            categories={question.dragdrop_categories}
+            placements={placements}
+            submitted={submitted}
+            onChange={(next) => setStructuredAnswer({ kind: "DRAG_DROP", placements: next })}
+          />
+        );
+      }
+      case "HOTSPOT": {
+        const selectedTargetIds = structuredAnswer?.kind === "HOTSPOT" ? structuredAnswer.selectedTargetIds : [];
+        return (
+          <HotSpotQuestion
+            clinicalScenario={question.case_study?.shared_scenario ?? question.clinical_scenario}
+            stem={question.stem}
+            targets={question.hotspot_targets}
+            selectedTargetIds={selectedTargetIds}
+            submitted={submitted}
+            onToggle={(targetId) =>
+              setStructuredAnswer({
+                kind: "HOTSPOT",
+                selectedTargetIds: selectedTargetIds.includes(targetId)
+                  ? selectedTargetIds.filter((id) => id !== targetId)
+                  : [...selectedTargetIds, targetId],
+              })
+            }
+          />
+        );
+      }
+      default:
+        return null;
+    }
   }
 
   return (
@@ -132,25 +312,11 @@ function QuizSessionInner({ quizSession }: { quizSession: QuizSessionData }) {
       </div>
 
       {isSupported ? (
-        <QuestionCard question={question} questionNumber={session.currentIndex + 1}>
-          {question.question_type === "MCQ" ? (
-            <MCQChoiceList
-              choices={question.answer_choices}
-              selectedId={selectedIds[0] ?? null}
-              submitted={submitted}
-              onSelect={(choiceId) => dispatch({ type: "SELECT_SINGLE", questionId: question.id, choiceId })}
-            />
-          ) : (
-            <SATAChoiceList
-              choices={question.answer_choices}
-              selectedIds={selectedIds}
-              submitted={submitted}
-              onToggle={(choiceId) => dispatch({ type: "TOGGLE_MULTI", questionId: question.id, choiceId })}
-            />
-          )}
+        <QuestionCard question={question} questionNumber={session.currentIndex + 1} hideStem={effectiveType === "HOTSPOT"}>
+          {renderQuestionBody()}
         </QuestionCard>
       ) : (
-        <UnsupportedQuestionTypeNotice questionType={question.question_type} onSkip={goNextOrFinish} />
+        <UnsupportedQuestionTypeNotice questionType={effectiveType} onSkip={goNextOrFinish} />
       )}
 
       {isSupported && submitted && showFeedbackBar && (
@@ -170,10 +336,11 @@ function QuizSessionInner({ quizSession }: { quizSession: QuizSessionData }) {
               <button
                 type="button"
                 className="btn-primary"
-                disabled={selectedIds.length === 0 || submitMutation.isPending}
+                disabled={!hasAnswer(question, answer) || submitMutation.isPending}
                 onClick={() => {
+                  if (!answer) return;
                   questionTimeSpentRef.current = Math.round((Date.now() - questionStartedAtRef.current) / 1000);
-                  submitMutation.mutate({ questionId: question.id, selectedChoiceIds: selectedIds });
+                  submitMutation.mutate({ questionId: question.id, answer });
                 }}
               >
                 {submitMutation.isPending ? "Submitting..." : "Submit answer"}

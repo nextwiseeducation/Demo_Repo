@@ -36,18 +36,39 @@ export function createQuizSession(filters: QuizFilters) {
 }
 
 /**
+ * One question's answer, in whichever of the 6 possible shapes matches its
+ * effective type (see effectiveQuestionType). Exactly one field besides
+ * timeTakenSeconds is expected to be non-empty — submitSessionAnswer sends
+ * every field regardless (empty arrays for the ones that don't apply),
+ * matching QuizAnswerSubmitSerializer's all-optional-but-one-required shape
+ * on the backend.
+ */
+export interface SubmitAnswerPayload {
+  questionId: string;
+  timeTakenSeconds: number;
+  selectedChoiceIds?: string[];
+  matrixSelections?: { row_id: number; column_id: number }[];
+  bowtieOptionIds?: number[];
+  clozeSelections?: { blank_id: number; option_id: number }[];
+  dragdropPlacements?: { item_id: number; category_id: number | null; order: number | null }[];
+  hotspotTargetIds?: number[];
+}
+
+/**
  * POST /api/quizzes/sessions/<id>/answers/ — grades AND persists an answer
  * within a real session, unlike questions.ts' submitAnswer (stateless
  * preview). This is what the live quiz-taking flow uses.
  */
-export function submitSessionAnswer(
-  sessionId: string,
-  payload: { questionId: string; selectedChoiceIds: string[]; timeTakenSeconds: number },
-) {
+export function submitSessionAnswer(sessionId: string, payload: SubmitAnswerPayload) {
   return apiClient
     .post<SubmitAnswerResult>(`/quizzes/sessions/${sessionId}/answers/`, {
       question_id: payload.questionId,
-      selected_choice_ids: payload.selectedChoiceIds,
+      selected_choice_ids: payload.selectedChoiceIds ?? [],
+      matrix_selections: payload.matrixSelections ?? [],
+      bowtie_option_ids: payload.bowtieOptionIds ?? [],
+      cloze_selections: payload.clozeSelections ?? [],
+      dragdrop_placements: payload.dragdropPlacements ?? [],
+      hotspot_target_ids: payload.hotspotTargetIds ?? [],
       time_taken_seconds: payload.timeTakenSeconds,
     })
     .then((r) => r.data);

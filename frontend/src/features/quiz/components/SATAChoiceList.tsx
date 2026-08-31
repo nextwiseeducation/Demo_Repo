@@ -10,15 +10,18 @@ export function SATAChoiceList({
   selectedIds,
   submitted,
   onToggle,
+  label = "Select all that apply",
 }: {
   choices: AnswerChoice[];
   selectedIds: string[];
   submitted: boolean;
   onToggle: (choiceId: string) => void;
+  /** Overridable so EMRChoiceList (identical interaction, different instruction copy) can reuse this without duplicating the markup. */
+  label?: string;
 }) {
   return (
     <div className="choices">
-      <p className="sata-label">Select all that apply</p>
+      <p className="sata-label">{label}</p>
       {[...choices]
         .sort((a, b) => a.display_order - b.display_order)
         .map((choice) => {

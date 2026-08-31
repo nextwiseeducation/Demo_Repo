@@ -1,6 +1,19 @@
 from rest_framework import serializers
 
-from .models import AnswerChoice, Question
+from apps.taxonomy.models import CaseStudy
+
+from .models import (
+    AnswerChoice,
+    BowTieOption,
+    ClozeBlank,
+    ClozeOption,
+    DragDropCategory,
+    DragDropItem,
+    HotSpotTarget,
+    MatrixColumn,
+    MatrixRow,
+    Question,
+)
 
 
 class PublicAnswerChoiceSerializer(serializers.ModelSerializer):
@@ -14,6 +27,73 @@ class PublicAnswerChoiceSerializer(serializers.ModelSerializer):
     class Meta:
         model = AnswerChoice
         fields = ["id", "choice_text", "display_order"]
+
+
+# --- NGN public (pre-answer) serializers -----------------------------------
+# Same "hide the key" rule as PublicAnswerChoiceSerializer above, applied to
+# each NGN stub model: is_correct/rationale are never included here. Each
+# type's answer key is instead revealed post-submit by the matching
+# build_*_answer_key() in services.py, mirroring how build_answer_key()
+# already does this for AnswerChoice.
+
+
+class PublicMatrixRowSerializer(serializers.ModelSerializer):
+    class Meta:
+        model = MatrixRow
+        fields = ["id", "text", "display_order"]
+
+
+class PublicMatrixColumnSerializer(serializers.ModelSerializer):
+    class Meta:
+        model = MatrixColumn
+        fields = ["id", "text", "display_order"]
+
+
+class PublicBowTieOptionSerializer(serializers.ModelSerializer):
+    class Meta:
+        model = BowTieOption
+        fields = ["id", "section", "option_text", "display_order"]
+
+
+class PublicClozeOptionSerializer(serializers.ModelSerializer):
+    class Meta:
+        model = ClozeOption
+        fields = ["id", "option_text"]
+
+
+class PublicClozeBlankSerializer(serializers.ModelSerializer):
+    options = PublicClozeOptionSerializer(many=True, read_only=True)
+
+    class Meta:
+        model = ClozeBlank
+        fields = ["id", "blank_key", "display_order", "options"]
+
+
+class PublicDragDropCategorySerializer(serializers.ModelSerializer):
+    class Meta:
+        model = DragDropCategory
+        fields = ["id", "name", "display_order"]
+
+
+class PublicDragDropItemSerializer(serializers.ModelSerializer):
+    class Meta:
+        model = DragDropItem
+        # Neither correct_category nor correct_order is included — that's
+        # the answer key. display_order is the shuffled/starting position
+        # the item is presented in, which is fine to reveal upfront.
+        fields = ["id", "text", "display_order"]
+
+
+class PublicHotSpotTargetSerializer(serializers.ModelSerializer):
+    class Meta:
+        model = HotSpotTarget
+        fields = ["id", "target_text", "display_order"]
+
+
+class CaseStudySerializer(serializers.ModelSerializer):
+    class Meta:
+        model = CaseStudy
+        fields = ["id", "title", "shared_scenario"]
 
 
 class QuestionListSerializer(serializers.ModelSerializer):
@@ -48,13 +128,37 @@ class QuestionListSerializer(serializers.ModelSerializer):
     )
     answer_choices = PublicAnswerChoiceSerializer(many=True, read_only=True)
 
+    # --- NGN nested data, added so MATRIX/BOWTIE/CLOZE/DRAG_DROP/HOTSPOT
+    # questions carry the fields their renderer actually needs, same as
+    # answer_choices does for MCQ/SATA/EMR. Every question serializes all of
+    # these regardless of its own question_type — each is simply an empty
+    # list/null for a question that isn't that type, which costs nothing
+    # (prefetched, not queried per-field) and keeps this serializer from
+    # needing a question_type-conditional branch.
+    matrix_rows = PublicMatrixRowSerializer(many=True, read_only=True)
+    matrix_columns = PublicMatrixColumnSerializer(many=True, read_only=True)
+    bowtie_options = PublicBowTieOptionSerializer(many=True, read_only=True)
+    cloze_blanks = PublicClozeBlankSerializer(many=True, read_only=True)
+    dragdrop_items = PublicDragDropItemSerializer(many=True, read_only=True)
+    dragdrop_categories = PublicDragDropCategorySerializer(many=True, read_only=True)
+    hotspot_targets = PublicHotSpotTargetSerializer(many=True, read_only=True)
+    case_study = CaseStudySerializer(read_only=True)
+    image = serializers.FileField(read_only=True, use_url=True, allow_null=True)
+
     class Meta:
         model = Question
         fields = [
             "id",
             "question_type",
+            # Only meaningful when question_type=NGN_CASE — says which real
+            # item type (MCQ, MATRIX, BOWTIE, ...) this case-study item
+            # should render as. See Question.ngn_type's own docstring.
+            "ngn_type",
             "stem",
             "clinical_scenario",
+            "image",
+            "case_study",
+            "case_study_sequence",
             "difficulty",
             "domain",
             "domain_id",
@@ -66,6 +170,13 @@ class QuestionListSerializer(serializers.ModelSerializer):
             "nclex_client_needs_subcategory_id",
             "clinical_judgment_skill",
             "answer_choices",
+            "matrix_rows",
+            "matrix_columns",
+            "bowtie_options",
+            "cloze_blanks",
+            "dragdrop_items",
+            "dragdrop_categories",
+            "hotspot_targets",
             "key_takeaway",
             "updated_at",
         ]

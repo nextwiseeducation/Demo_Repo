@@ -117,6 +117,16 @@ class StudentResponseLog(UUIDPKMixin, models.Model):
     # NOT NULL equivalent for M2M — an empty set is always valid), stated
     # here for form/admin validation purposes.
     selected_choices = models.ManyToManyField(AnswerChoice, blank=True, related_name="multi_responses")
+    # What a student submitted for the NGN types that aren't AnswerChoice-
+    # based (MATRIX/BOWTIE/CLOZE/DRAG_DROP/HOTSPOT) — selected_choice/
+    # selected_choices above only fit a "pick from a list of AnswerChoice
+    # rows" shape, and each NGN type's answer has its own, different shape
+    # (row->column pairs, blank->option pairs, item placements, ...). A
+    # JSONField here avoids five more nullable FK/M2M fields that would only
+    # ever be populated one-at-a-time depending on question_type — same
+    # "shape isn't fixed yet" reasoning as QuizSession.filter_config above.
+    # Stays empty ({}) for MCQ/SATA/EMR, which keep using selected_choice(s).
+    selected_payload = models.JSONField(default=dict, blank=True)
     # No default — every response log entry must explicitly state whether
     # it was correct at creation time (this is computed by the scoring
     # logic that creates the row, not inferred later from selected_choice).
