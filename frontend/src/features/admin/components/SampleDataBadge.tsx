@@ -12,7 +12,7 @@ export function SampleDataBadge() {
   return (
     <Badge
       variant="outline"
-      className="h-auto max-w-[160px] border-accent/40 bg-accent/10 py-1 text-right text-[10px] leading-tight whitespace-normal text-accent-foreground"
+      className="h-auto max-w-[160px] border-accent/40 bg-accent/10 py-1 text-right text-[10px] leading-tight whitespace-normal text-foreground"
     >
       {SAMPLE_DATA_BADGE_LABEL}
     </Badge>
