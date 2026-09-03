@@ -542,7 +542,7 @@ from django.core.management import call_command
 
 from apps.taxonomy.models import CaseStudy, Domain
 
-from .models import MatrixCell
+from .models import MatrixCell, MatrixColumn, MatrixRow
 
 
 def _write_sheet(wb, name, headers, rows):
@@ -872,12 +872,34 @@ class ImportNgnItemBankTests(TestCase):
         self._run(wb)
         self.assertFalse(Question.objects.filter(external_id="EHS-1").exists())
 
-    def test_matrix_with_more_than_two_columns_is_rejected(self):
+    def test_matrix_with_more_than_two_columns_is_accepted(self):
+        # The importer's column set is inferred from the union of each
+        # row's own correct-answer label, so a 3rd row naming a 3rd
+        # distinct column ("Neither") both adds a new matrix row AND
+        # grows the column count to 3 — this now matches the admin
+        # dashboard's builder, which has never capped column count.
         wb = _build_workbook()
         ws = wb["Answer_Options"]
-        # Add a 3rd row with a 3rd distinct column label — over the
-        # importer's current 2-column-only support.
         ws.append(["MTX-1", "Finding C", "Neither", "TRUE", "Ambiguous."])
+        self._run(wb)
+
+        question = Question.objects.get(external_id="MTX-1")
+        self.assertEqual(MatrixColumn.objects.filter(question=question).count(), 3)
+        self.assertEqual(MatrixRow.objects.filter(question=question).count(), 3)
+        # 3 rows x 3 columns = 9 cells, synthesized the same way the
+        # 2-column case already was — one correct cell per row, the rest
+        # false.
+        self.assertEqual(MatrixCell.objects.filter(row__question=question).count(), 9)
+        self.assertEqual(MatrixCell.objects.filter(row__question=question, is_correct=True).count(), 3)
+
+    def test_matrix_with_fewer_than_two_columns_is_rejected(self):
+        # Every row in this fixture names the SAME column as its correct
+        # answer, so the union of correct-answer labels never grows past 1.
+        wb = _build_workbook()
+        ws = wb["Answer_Options"]
+        for row in ws.iter_rows(min_row=2):
+            if row[0].value == "MTX-1":
+                row[2].value = "Expected"
         self._run(wb)
         self.assertFalse(Question.objects.filter(external_id="MTX-1").exists())
 

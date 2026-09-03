@@ -671,13 +671,23 @@ class NgnItemBankImporter:
 
     @staticmethod
     def _sync_matrix(question, options):
+        """
+        Column set is INFERRED from the union of each row's own
+        Option_Text (its correct answer) — the sheet never lists a
+        column explicitly, only which column is correct for each row.
+        This means a column that is never the correct answer for ANY row
+        in the sheet is invisible to this inference and silently won't
+        exist on the imported question, however many distinct columns
+        are present. That's a property of the format itself, independent
+        of how many columns there are — content authors should make sure
+        every column appears as at least one row's correct answer.
+        """
         if not options:
             raise RowError("no Answer_Options rows for this Matrix/Grid question")
         column_names = list(dict.fromkeys(opt.get("Option_Text") for opt in options))
-        if len(column_names) != 2:
+        if len(column_names) < 2:
             raise RowError(
-                f"Matrix/Grid import only supports exactly 2 columns right now, found {len(column_names)}: "
-                f"{column_names}"
+                f"Matrix/Grid questions require at least 2 columns, found {len(column_names)}: {column_names}"
             )
 
         question.matrix_rows.all().delete()
