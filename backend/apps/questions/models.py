@@ -1,3 +1,4 @@
+from django.conf import settings
 from django.core.exceptions import ValidationError
 from django.core.validators import FileExtensionValidator
 from django.db import models
@@ -197,7 +198,9 @@ class Question(UUIDPKMixin, TimeStampedMixin, models.Model):
     # existing rows have no correct value to guess at (see seed_domains'
     # docstring) — left for the content team/admin to backfill rather than
     # auto-assigned.
-    domain = models.ForeignKey(Domain, on_delete=models.PROTECT, null=True, blank=True, related_name="questions")
+    domain = models.ForeignKey(
+        Domain, on_delete=models.PROTECT, null=True, blank=True, related_name="questions"
+    )
     # on_delete=PROTECT (not CASCADE, unlike case_study above) is
     # deliberate here: it should be IMPOSSIBLE to delete a NursingSystem/
     # Topic/ClientNeedsCategory/etc. while any Question still references it
@@ -572,3 +575,49 @@ class HotSpotTarget(models.Model):
 
     def __str__(self):
         return self.target_text
+
+
+class ImportLog(UUIDPKMixin, models.Model):
+    """
+    One row per completed bulk question import, from either the admin
+    dashboard's upload endpoint or the import_ngn_item_bank management
+    command (see apps.questions.importer.write_import_log — the single
+    place these rows are created). Dry runs are never logged.
+
+    Lives here rather than in apps.admin_api because the management
+    command lives in this app and must be able to write a row without
+    apps.questions importing from apps.admin_api, which would invert the
+    intended dependency direction (admin_api depends on questions, never
+    the reverse).
+    """
+
+    # SET_NULL, nullable: the management-command path has no request.user
+    # at all (it's run from a local shell), and a departed admin's account
+    # being deleted must not erase the historical record that an import
+    # happened.
+    uploaded_by = models.ForeignKey(
+        settings.AUTH_USER_MODEL,
+        on_delete=models.SET_NULL,
+        null=True,
+        blank=True,
+        related_name="question_imports",
+    )
+    uploaded_at = models.DateTimeField(auto_now_add=True)
+    questions_imported = models.PositiveIntegerField(default=0)
+    rows_failed = models.PositiveIntegerField(default=0)
+    # Without a filename, an Import History tab showing several rows of
+    # "12 imported, 0 failed" can't tell an editor which batch each one
+    # was. blank=True since the management-command path always has a
+    # filename (the --file argument) but nothing stops a future caller
+    # from omitting it.
+    source_filename = models.CharField(max_length=255, blank=True)
+    # [{"label": ..., "message": ...}, ...] — the same list the upload
+    # response returns, so the history tab can show a failed run's actual
+    # per-row errors later instead of just a bare count.
+    errors = models.JSONField(default=list, blank=True)
+
+    class Meta:
+        ordering = ["-uploaded_at"]
+
+    def __str__(self):
+        return f"ImportLog({self.uploaded_at:%Y-%m-%d %H:%M}, {self.questions_imported} imported, {self.rows_failed} failed)"

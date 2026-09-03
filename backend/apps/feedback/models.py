@@ -35,6 +35,14 @@ class RecommendLikelihood(models.TextChoices):
     DEFINITELY_YES = "DEFINITELY_YES", "Definitely yes"
 
 
+class FeedbackStatus(models.TextChoices):
+    """The Feedback dashboard's triage state for a survey response — set by an admin, never by the student who submitted it."""
+
+    IN_CONSIDERATION = "IN_CONSIDERATION", "In consideration"
+    IMPLEMENTED = "IMPLEMENTED", "Implemented"
+    REJECTED = "REJECTED", "Rejected"
+
+
 class QuizFeedback(UUIDPKMixin, models.Model):
     """One student's end-of-quiz survey response."""
 
@@ -74,8 +82,20 @@ class QuizFeedback(UUIDPKMixin, models.Model):
     improvement_suggestion = models.TextField(blank=True)
     recommend_likelihood = models.CharField(max_length=20, choices=RecommendLikelihood.choices)
 
-    # Write-once: a feedback submission is never edited afterward, so only
-    # created_at is needed (no updated_at/TimeStampedMixin).
+    # The student-submitted fields above are write-once, as this model's
+    # name and every other field suggest — but status below is NOT one of
+    # them: it's admin-owned triage state set from the Feedback dashboard
+    # (apps.admin_api), tracking what the content team decided to do about
+    # a piece of feedback, entirely separate from what the student
+    # reported. created_at alone was sufficient back when every field here
+    # really was immutable; status_updated_at exists because this row can
+    # now change after creation and "when was this triaged" needs its own
+    # answer distinct from "when was this submitted".
+    status = models.CharField(
+        max_length=20, choices=FeedbackStatus.choices, default=FeedbackStatus.IN_CONSIDERATION
+    )
+    status_updated_at = models.DateTimeField(null=True, blank=True)
+
     created_at = models.DateTimeField(auto_now_add=True)
 
     class Meta:

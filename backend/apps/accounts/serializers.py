@@ -21,6 +21,7 @@ from django.contrib.auth.password_validation import validate_password
 from django.core.exceptions import ValidationError as DjangoValidationError
 from django.utils import timezone
 from rest_framework import serializers
+from rest_framework_simplejwt.serializers import TokenObtainPairSerializer
 
 # get_user_model() (rather than importing User directly from .models) is
 # the Django-recommended way to reference the active user model — respects
@@ -149,7 +150,12 @@ class RegisterSerializer(serializers.ModelSerializer):
 class MeSerializer(serializers.ModelSerializer):
     class Meta:
         model = User
-        fields = ["email", "full_name", "subscription_status"]
+        # role is included so the frontend can gate the admin dashboard nav
+        # and routes (RequireRole) off the same object AuthContext already
+        # fetches on login/bootstrap — no JWT decoding, no extra request,
+        # and it stays fresh on every /me/ call rather than living in a
+        # token claim for up to the refresh token's 14-day lifetime.
+        fields = ["email", "full_name", "subscription_status", "role"]
         # read_only_fields = fields marks every listed field read-only in
         # one line — appropriate here since MeSerializer is only ever used
         # to serialize the current user for GET /api/auth/me/ (see
@@ -184,3 +190,23 @@ class PasswordResetConfirmSerializer(serializers.Serializer):
     # shape a field validator would have produced, which is what the reset
     # form on the frontend reads.
     new_password = serializers.CharField()
+
+
+class RoleTokenObtainPairSerializer(TokenObtainPairSerializer):
+    """
+    Adds the user's role as a JWT claim, so a consumer holding only the
+    token (not a live session) can read it without a database round trip.
+
+    IMPORTANT: this claim is NOT the source of truth authorization is
+    decided from — apps.accounts.permissions.IsSuperuser/
+    IsContentAdminOrAbove read request.user.role straight from the
+    database on every request. See those classes' docstrings for why: a
+    role demoted server-side must not remain valid via a stale token claim
+    for up to the refresh token's lifetime.
+    """
+
+    @classmethod
+    def get_token(cls, user):
+        token = super().get_token(user)
+        token["role"] = user.role
+        return token

@@ -15,6 +15,7 @@ import {
 } from "@/components/ui/dropdown-menu";
 import { useAuth } from "@/features/auth/AuthContext";
 import { ROUTES } from "@/lib/constants";
+import { visibleAdminNavItems } from "@/types/role";
 
 const SUBSCRIPTION_LABELS: Record<string, string> = {
   FREE: "Free plan",
@@ -43,6 +44,11 @@ export function AppShell() {
             <nav>
               <NavItem to={ROUTES.dashboard}>Dashboard</NavItem>
               <NavItem to={ROUTES.quizSetup}>Practice</NavItem>
+              {visibleAdminNavItems(user?.role).map((item) => (
+                <NavItem key={item.to} to={item.to}>
+                  {item.label}
+                </NavItem>
+              ))}
             </nav>
           </div>
 

@@ -5,10 +5,13 @@ export interface TokenPair {
 
 export type SubscriptionStatus = "FREE" | "ACTIVE" | "PAST_DUE" | "CANCELED";
 
+export type UserRole = "STUDENT" | "CONTENT_ADMIN" | "SUPERUSER";
+
 export interface Me {
   email: string;
   full_name: string;
   subscription_status: SubscriptionStatus;
+  role: UserRole;
 }
 
 /**

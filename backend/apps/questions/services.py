@@ -204,7 +204,9 @@ def grade_matrix(question: Question, matrix_selections) -> GradedResult:
         correct_by_row.setdefault(cell[0], set()).add(cell[1])
 
     if any(row.id not in correct_by_row for row in rows):
-        raise QuestionNotGradeable(f"Question {question.pk} has a matrix row with no correct column and cannot be graded.")
+        raise QuestionNotGradeable(
+            f"Question {question.pk} has a matrix row with no correct column and cannot be graded."
+        )
 
     selected_by_row: dict[int, int] = {}
     for selection in matrix_selections:
@@ -229,10 +231,14 @@ def grade_bowtie(question: Question, bowtie_option_ids) -> GradedResult:
     valid_ids = {option.id for option in options}
     correct_ids = {option.id for option in options if option.is_correct}
     if not correct_ids:
-        raise QuestionNotGradeable(f"Question {question.pk} has no correct bow-tie option and cannot be graded.")
+        raise QuestionNotGradeable(
+            f"Question {question.pk} has no correct bow-tie option and cannot be graded."
+        )
 
     selected_ids = _coerce_ints(bowtie_option_ids) & valid_ids
-    return GradedResult(is_correct=selected_ids == correct_ids, detail={"selected_option_ids": sorted(selected_ids)})
+    return GradedResult(
+        is_correct=selected_ids == correct_ids, detail={"selected_option_ids": sorted(selected_ids)}
+    )
 
 
 def grade_cloze(question: Question, cloze_selections) -> GradedResult:
@@ -255,7 +261,9 @@ def grade_cloze(question: Question, cloze_selections) -> GradedResult:
         if blank_id and option_id:
             selected_by_blank[next(iter(blank_id))] = next(iter(option_id))
 
-    is_correct = all(selected_by_blank.get(blank_id) == correct for blank_id, correct in correct_by_blank.items())
+    is_correct = all(
+        selected_by_blank.get(blank_id) == correct for blank_id, correct in correct_by_blank.items()
+    )
     return GradedResult(is_correct=is_correct, detail={"selected_by_blank": selected_by_blank})
 
 
@@ -275,7 +283,9 @@ def grade_dragdrop(question: Question, dragdrop_placements) -> GradedResult:
     is_category_variant = any(item.correct_category_id is not None for item in items)
     is_order_variant = any(item.correct_order is not None for item in items)
     if not is_category_variant and not is_order_variant:
-        raise QuestionNotGradeable(f"Question {question.pk} has no drag-drop answer key and cannot be graded.")
+        raise QuestionNotGradeable(
+            f"Question {question.pk} has no drag-drop answer key and cannot be graded."
+        )
 
     placement_by_item: dict[int, dict] = {}
     for placement in dragdrop_placements:
@@ -286,7 +296,8 @@ def grade_dragdrop(question: Question, dragdrop_placements) -> GradedResult:
 
     if is_category_variant:
         is_correct = all(
-            _coerce_ints([placement_by_item.get(item.id, {}).get("category_id")]) == _coerce_ints([item.correct_category_id])
+            _coerce_ints([placement_by_item.get(item.id, {}).get("category_id")])
+            == _coerce_ints([item.correct_category_id])
             for item in items
         )
     else:
@@ -303,15 +314,24 @@ def grade_hotspot(question: Question, hotspot_target_ids) -> GradedResult:
     valid_ids = {target.id for target in targets}
     correct_ids = {target.id for target in targets if target.is_correct}
     if not correct_ids:
-        raise QuestionNotGradeable(f"Question {question.pk} has no correct hot spot target and cannot be graded.")
+        raise QuestionNotGradeable(
+            f"Question {question.pk} has no correct hot spot target and cannot be graded."
+        )
 
     selected_ids = _coerce_ints(hotspot_target_ids) & valid_ids
-    return GradedResult(is_correct=selected_ids == correct_ids, detail={"selected_target_ids": sorted(selected_ids)})
+    return GradedResult(
+        is_correct=selected_ids == correct_ids, detail={"selected_target_ids": sorted(selected_ids)}
+    )
 
 
 def build_matrix_answer_key(question: Question) -> list[dict]:
     return [
-        {"row_id": cell.row_id, "column_id": cell.column_id, "is_correct": cell.is_correct, "rationale": cell.rationale}
+        {
+            "row_id": cell.row_id,
+            "column_id": cell.column_id,
+            "is_correct": cell.is_correct,
+            "rationale": cell.rationale,
+        }
         for cell in MatrixCell.objects.filter(row__question=question).select_related("row", "column")
     ]
 

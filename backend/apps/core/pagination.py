@@ -27,3 +27,19 @@ class DefaultPagination(PageNumberPagination):
     # ...but caps how far that can be pushed, so a caller can't reintroduce
     # the unpaginated-response problem by passing page_size=100000.
     max_page_size = 200
+
+
+class AdminTablePagination(PageNumberPagination):
+    """
+    The Content Team question table (apps.admin_api) — 20 rows per page,
+    fixed server-side rather than via page_size_query_param, so the page
+    size is a contract the client can't accidentally diverge from.
+    """
+
+    page_size = 20
+
+
+class AdminFeedbackPagination(PageNumberPagination):
+    """The Feedback dashboard's survey/issue-report tables (apps.admin_api) — 25 rows per page."""
+
+    page_size = 25

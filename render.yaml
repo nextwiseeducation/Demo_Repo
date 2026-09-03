@@ -27,7 +27,13 @@ services:
     # even if the deploy that follows it fails. Worth moving to
     # preDeployCommand if this service is ever upgraded to a paid plan.
     buildCommand: "pip install -r requirements.txt && python manage.py collectstatic --noinput && python manage.py migrate --noinput && python manage.py createcachetable && python manage.py seed_client_needs && python manage.py ensure_superuser"
-    startCommand: "gunicorn config.wsgi --log-file -"
+    # --timeout 120 (up from gunicorn's 30s default): POST /api/admin/import/
+    # (apps.admin_api) runs the NGN item-bank importer synchronously in-request
+    # — there's no task queue on this project (see CACHES in
+    # config/settings/base.py). A real multi-thousand-row workbook can take
+    # well over 30s, and since the importer commits per row, a worker killed
+    # mid-run leaves a partial import with no ImportLog row explaining it.
+    startCommand: "gunicorn config.wsgi --timeout 120 --log-file -"
     envVars:
       - key: DJANGO_SETTINGS_MODULE
         value: config.settings.production

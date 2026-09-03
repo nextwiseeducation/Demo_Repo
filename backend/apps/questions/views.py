@@ -31,7 +31,12 @@ class QuestionListView(generics.ListAPIView):
     queryset = (
         Question.objects.filter(is_active=True)
         .select_related(
-            "domain", "nursing_system", "topic", "nclex_client_needs_category", "nclex_client_needs_subcategory", "case_study"
+            "domain",
+            "nursing_system",
+            "topic",
+            "nclex_client_needs_category",
+            "nclex_client_needs_subcategory",
+            "case_study",
         )
         .prefetch_related(
             "answer_choices",

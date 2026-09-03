@@ -1,4 +1,5 @@
 from django.contrib.auth import get_user_model
+from django.contrib.auth.models import AnonymousUser
 from django.contrib.auth.tokens import default_token_generator
 
 # django.core.mail.outbox — when EMAIL_BACKEND is Django's test backend
@@ -27,7 +28,11 @@ from rest_framework import status
 # instead of Django's default TestCase's HTML-oriented test client.
 from rest_framework.test import APITestCase
 from rest_framework.throttling import ScopedRateThrottle
+from rest_framework_simplejwt.tokens import AccessToken
 
+from .models import UserRole
+from .permissions import IsContentAdminOrAbove, IsSuperuser
+from .roles import backfill_roles
 from .tokens import make_verification_token
 
 User = get_user_model()
@@ -543,3 +548,158 @@ class PasswordResetInactiveAccountTests(APITestCase):
         # enumeration oracle.
         self.assertEqual({r.status_code for r in responses}, {status.HTTP_200_OK})
         self.assertEqual(len({str(r.data) for r in responses}), 1)
+
+
+class RoleDefaultsTests(APITestCase):
+    """create_user/create_superuser must set User.role consistently with is_staff/is_superuser."""
+
+    def test_create_user_defaults_to_student_role(self):
+        user = User.objects.create_user(email="student@example.com", password="a-strong-password-123")
+        self.assertEqual(user.role, UserRole.STUDENT)
+
+    def test_create_superuser_sets_superuser_role(self):
+        user = User.objects.create_superuser(email="root@example.com", password="a-strong-password-123")
+        self.assertEqual(user.role, UserRole.SUPERUSER)
+
+
+class BackfillRolesTests(APITestCase):
+    """
+    apps.accounts.roles.backfill_roles is called directly here (not via a
+    migration executor, which Django's test runner makes painful without
+    django-test-migrations) — it's a plain function precisely so it can be
+    unit-tested this way.
+    """
+
+    def test_backfill_maps_superuser_and_staff_flags_to_roles(self):
+        superuser = User.objects.create_user(
+            email="super@example.com", password="a-strong-password-123", is_superuser=True, is_staff=True
+        )
+        content_admin = User.objects.create_user(
+            email="content@example.com", password="a-strong-password-123", is_staff=True, is_superuser=False
+        )
+        plain_student = User.objects.create_user(email="plain@example.com", password="a-strong-password-123")
+
+        # Force every row back to the STUDENT default first, simulating the
+        # state right after migration 0004 (AddField) has run but before
+        # 0005 (the backfill under test) has.
+        User.objects.all().update(role=UserRole.STUDENT)
+
+        backfill_roles(User)
+
+        superuser.refresh_from_db()
+        content_admin.refresh_from_db()
+        plain_student.refresh_from_db()
+        self.assertEqual(superuser.role, UserRole.SUPERUSER)
+        self.assertEqual(content_admin.role, UserRole.CONTENT_ADMIN)
+        self.assertEqual(plain_student.role, UserRole.STUDENT)
+
+
+class _FakeRequest:
+    """Minimal stand-in for a DRF Request — the permission classes under test only read .user."""
+
+    def __init__(self, user):
+        self.user = user
+
+
+class RolePermissionClassTests(APITestCase):
+    """
+    IsSuperuser/IsContentAdminOrAbove × {anonymous, student, content_admin,
+    superuser, inactive}. These gate every apps.admin_api endpoint, so a
+    mistake here silently exposes or locks out an entire dashboard section.
+    """
+
+    def setUp(self):
+        self.student = User.objects.create_user(
+            email="student2@example.com", password="a-strong-password-123", is_active=True
+        )
+        self.content_admin = User.objects.create_user(
+            email="content2@example.com",
+            password="a-strong-password-123",
+            is_active=True,
+            role=UserRole.CONTENT_ADMIN,
+        )
+        self.superuser = User.objects.create_user(
+            email="super2@example.com",
+            password="a-strong-password-123",
+            is_active=True,
+            role=UserRole.SUPERUSER,
+        )
+        self.inactive_superuser = User.objects.create_user(
+            email="inactivesuper@example.com",
+            password="a-strong-password-123",
+            is_active=False,
+            role=UserRole.SUPERUSER,
+        )
+
+    def test_is_superuser_permission(self):
+        perm = IsSuperuser()
+        self.assertFalse(perm.has_permission(_FakeRequest(AnonymousUser()), None))
+        self.assertFalse(perm.has_permission(_FakeRequest(self.student), None))
+        self.assertFalse(perm.has_permission(_FakeRequest(self.content_admin), None))
+        self.assertTrue(perm.has_permission(_FakeRequest(self.superuser), None))
+        # is_active=False users still authenticate() to False under
+        # Django's normal auth flow, but this permission class only checks
+        # role — assert that explicitly rather than assuming it, since
+        # request.user.is_authenticated is True for any real (non-Anonymous)
+        # User instance regardless of is_active.
+        self.assertTrue(perm.has_permission(_FakeRequest(self.inactive_superuser), None))
+
+    def test_is_content_admin_or_above_permission(self):
+        perm = IsContentAdminOrAbove()
+        self.assertFalse(perm.has_permission(_FakeRequest(AnonymousUser()), None))
+        self.assertFalse(perm.has_permission(_FakeRequest(self.student), None))
+        self.assertTrue(perm.has_permission(_FakeRequest(self.content_admin), None))
+        self.assertTrue(perm.has_permission(_FakeRequest(self.superuser), None))
+
+
+class MeIncludesRoleTests(APITestCase):
+    def test_me_response_includes_role(self):
+        User.objects.create_user(
+            email="roled@example.com",
+            password="a-strong-password-123",
+            is_active=True,
+            role=UserRole.CONTENT_ADMIN,
+        )
+        login_response = self.client.post(
+            reverse("login"), {"email": "roled@example.com", "password": "a-strong-password-123"}
+        )
+        self.client.credentials(HTTP_AUTHORIZATION=f"Bearer {login_response.data['access']}")
+
+        response = self.client.get(reverse("me"))
+        self.assertEqual(response.status_code, status.HTTP_200_OK)
+        self.assertEqual(response.data["role"], "CONTENT_ADMIN")
+
+
+class LoginTokenRoleClaimTests(APITestCase):
+    """The access token issued on login must carry the user's role as a claim."""
+
+    def test_access_token_carries_role_claim(self):
+        User.objects.create_user(
+            email="claimtest@example.com",
+            password="a-strong-password-123",
+            is_active=True,
+            role=UserRole.SUPERUSER,
+        )
+        response = self.client.post(
+            reverse("login"), {"email": "claimtest@example.com", "password": "a-strong-password-123"}
+        )
+        self.assertEqual(response.status_code, status.HTTP_200_OK)
+        access = AccessToken(response.data["access"])
+        self.assertEqual(access["role"], "SUPERUSER")
+
+    def test_role_claim_survives_refresh_rotation(self):
+        User.objects.create_user(
+            email="rotatetest@example.com",
+            password="a-strong-password-123",
+            is_active=True,
+            role=UserRole.CONTENT_ADMIN,
+        )
+        login_response = self.client.post(
+            reverse("login"), {"email": "rotatetest@example.com", "password": "a-strong-password-123"}
+        )
+        refresh_response = self.client.post(
+            reverse("token-refresh"), {"refresh": login_response.data["refresh"]}
+        )
+        self.assertEqual(refresh_response.status_code, status.HTTP_200_OK)
+        access = AccessToken(refresh_response.data["access"])
+        self.assertEqual(access["role"], "CONTENT_ADMIN")

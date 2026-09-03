@@ -106,6 +106,12 @@ INSTALLED_APPS = [
     # QuizFeedback + QuestionIssueReport — end-of-quiz survey and
     # per-question "Report an Issue" flags.
     "apps.feedback",
+    # The custom React admin dashboard's API surface (analytics, content
+    # management, bulk import, feedback triage). No models of its own — it
+    # is a facade over accounts/payments/quizzes/questions/taxonomy/
+    # feedback, so it lives in its own app rather than any single one of
+    # them.
+    "apps.admin_api",
 ]
 
 # Order matters: each request passes down through this list top-to-bottom,
@@ -253,11 +259,17 @@ STORAGES = {
 MEDIA_URL = "media/"
 MEDIA_ROOT = BASE_DIR / "media"
 
-# Upload ceilings. Django's own defaults are 2.5MB in-memory and unlimited
-# on disk; these cap the on-disk side too, so a single request can't fill
-# Render's (small, non-persistent) filesystem. Question.image additionally
-# validates extension and size at the field level — see
-# apps/questions/models.py.
+# Upload ceilings. DATA_UPLOAD_MAX_MEMORY_SIZE genuinely caps non-file POST
+# body size (request.body/request.POST) and raises RequestDataTooBig above
+# it. FILE_UPLOAD_MAX_MEMORY_SIZE is NOT an equivalent cap for file uploads
+# — Django excludes uploaded file data from the DATA_UPLOAD check entirely,
+# and this setting only decides the threshold above which an upload is
+# spooled to a temp file instead of held in memory; a file larger than it
+# is still accepted, just written to disk first. There is effectively no
+# built-in ceiling on uploaded file size unless something validates it
+# explicitly. Question.image does this at the field level (see
+# apps/questions/models.py); the admin bulk-import endpoint does it via
+# apps.questions.importer.MAX_IMPORT_FILE_BYTES, for the same reason.
 DATA_UPLOAD_MAX_MEMORY_SIZE = 5 * 1024 * 1024  # 5 MB
 FILE_UPLOAD_MAX_MEMORY_SIZE = 5 * 1024 * 1024  # 5 MB
 # Bounds how many fields one form/multipart POST may contain — the default
@@ -343,6 +355,14 @@ REST_FRAMEWORK = {
         # Feedback/issue reports accept free text, so an unbounded rate is a
         # cheap way to fill the database.
         "feedback": "20/hour",
+        # POST /api/admin/import/ (apps.admin_api) runs the NGN item-bank
+        # importer synchronously in-request — there is no task queue on
+        # this project (see CACHES above: DatabaseCache exists precisely
+        # because Render's free tier has no Redis/Celery broker), so a
+        # large workbook holds a gunicorn worker for the run's duration.
+        # This bounds how often that can happen; content admins import in
+        # batches, not continuously.
+        "admin_import": "12/hour",
     },
 }
 

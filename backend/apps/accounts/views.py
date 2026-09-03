@@ -51,6 +51,7 @@ from .serializers import (
     PasswordResetConfirmSerializer,
     PasswordResetRequestSerializer,
     RegisterSerializer,
+    RoleTokenObtainPairSerializer,
 )
 from .tokens import read_verification_token
 
@@ -196,10 +197,14 @@ class MeView(APIView):
 
 
 class LoginView(TokenObtainPairView):
-    # Everything except throttling is inherited from TokenObtainPairView —
-    # it already validates credentials via Django's authenticate() (which
-    # checks is_active, so an unverified account is correctly rejected) and
-    # returns {access, refresh} tokens on success.
+    # Credential validation and the {access, refresh} response shape are
+    # inherited from TokenObtainPairView (Django's authenticate(), which
+    # checks is_active so an unverified account is correctly rejected).
+    # serializer_class is overridden to also stamp a "role" claim onto the
+    # issued tokens (see RoleTokenObtainPairSerializer) — that claim is a
+    # convenience for token-only consumers, not what authorization checks
+    # against on this backend.
+    serializer_class = RoleTokenObtainPairSerializer
     throttle_classes = [ScopedRateThrottle]
     # 10/min per IP — slows down password-guessing/brute-force attempts
     # without meaningfully affecting a legitimate user who mistypes a

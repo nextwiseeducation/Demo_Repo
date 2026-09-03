@@ -25,6 +25,12 @@ urlpatterns = [
     # frontend needs (Domain/NursingSystem/ClientNeedsSubcategory ids+names)
     # is exposed via apps.quizzes' facet-counts endpoint instead, so a
     # separate read API for these models isn't needed yet.
+    #
+    # The custom admin dashboard (role-gated: analytics, content
+    # management, bulk import, feedback triage). "api/admin/" does not
+    # collide with "admin/" above — that's the Django admin *site*, this is
+    # a JSON API namespace — but it reads like a typo, hence this note.
+    path("api/admin/", include("apps.admin_api.urls")),
 ]
 
 if settings.DEBUG:

@@ -14,4 +14,7 @@ export const ROUTES = {
   termsAndConditions: "/terms-and-conditions",
   accessibility: "/accessibility",
   faq: "/faq",
+  adminAnalytics: "/admin/analytics",
+  adminContent: "/admin/content",
+  adminFeedback: "/admin/feedback",
 } as const;

@@ -562,16 +562,38 @@ def _build_workbook():
     wb.remove(wb.active)
 
     im_headers = [
-        "Question_ID", "Item_Type", "Domain", "Body_System", "Topic", "Subtopic", "Difficulty",
-        "Cognitive_Level", "Client_Needs_Category", "Client_Needs_Subcategory",
-        "Clinical_Judgment_Skill_Primary", "Clinical_Judgment_Skill_Secondary", "Tags", "Scenario", "Stem",
-        "Clinical_Tip", "Reference_Key",
+        "Question_ID",
+        "Item_Type",
+        "Domain",
+        "Body_System",
+        "Topic",
+        "Subtopic",
+        "Difficulty",
+        "Cognitive_Level",
+        "Client_Needs_Category",
+        "Client_Needs_Subcategory",
+        "Clinical_Judgment_Skill_Primary",
+        "Clinical_Judgment_Skill_Secondary",
+        "Tags",
+        "Scenario",
+        "Stem",
+        "Clinical_Tip",
+        "Reference_Key",
     ]
     common = dict(
-        Domain="Adult Health", Body_System="Cardiovascular", Topic="Heart Failure", Subtopic=None,
-        Difficulty="Moderate", Cognitive_Level="Apply", Client_Needs_Category="Physiological Integrity",
-        Client_Needs_Subcategory="Reduction of Risk Potential", Clinical_Judgment_Skill_Primary="Take Action",
-        Clinical_Judgment_Skill_Secondary=None, Tags="test, fixture", Scenario=None, Clinical_Tip="Tip.",
+        Domain="Adult Health",
+        Body_System="Cardiovascular",
+        Topic="Heart Failure",
+        Subtopic=None,
+        Difficulty="Moderate",
+        Cognitive_Level="Apply",
+        Client_Needs_Category="Physiological Integrity",
+        Client_Needs_Subcategory="Reduction of Risk Potential",
+        Clinical_Judgment_Skill_Primary="Take Action",
+        Clinical_Judgment_Skill_Secondary=None,
+        Tags="test, fixture",
+        Scenario=None,
+        Clinical_Tip="Tip.",
         Reference_Key=None,
     )
     im_rows = [
@@ -580,8 +602,10 @@ def _build_workbook():
         dict(Question_ID="BT-1", Item_Type="Bow-Tie", Stem="Complete the bow-tie.", **common),
         dict(Question_ID="CLZ-1", Item_Type="Cloze", Stem="The nurse should [dropdown 1].", **common),
         dict(
-            Question_ID="EHS-1", Item_Type="Hot Spot",
-            Stem="Highlight the finding: client is diaphoretic and pale.", **{**common, "Scenario": None},
+            Question_ID="EHS-1",
+            Item_Type="Hot Spot",
+            Stem="Highlight the finding: client is diaphoretic and pale.",
+            **{**common, "Scenario": None},
         ),
         dict(Question_ID="DND-1", Item_Type="Drag-and-Drop (Sequencing)", Stem="Order the steps.", **common),
         dict(Question_ID="CASE-1", Item_Type="NGN Case Study", Stem="See NGN_Components", **common),
@@ -590,47 +614,188 @@ def _build_workbook():
 
     ao_headers = ["Question_ID", "Option_ID", "Option_Text", "Is_Correct", "Rationale"]
     ao_rows = [
-        dict(Question_ID="MCQ-1", Option_ID="A", Option_Text="Right", Is_Correct="TRUE", Rationale="Because."),
-        dict(Question_ID="MCQ-1", Option_ID="B", Option_Text="Wrong", Is_Correct="FALSE", Rationale="Not this."),
-        dict(Question_ID="MTX-1", Option_ID="Finding A", Option_Text="Expected", Is_Correct="TRUE", Rationale="Normal."),
-        dict(Question_ID="MTX-1", Option_ID="Finding B", Option_Text="Unexpected", Is_Correct="TRUE", Rationale="Not normal."),
-        dict(Question_ID="BT-1", Option_ID="Action 1", Option_Text="Do X", Is_Correct="TRUE", Rationale="X helps."),
-        dict(Question_ID="BT-1", Option_ID="Action 2", Option_Text="Do Y", Is_Correct="FALSE", Rationale="Y doesn't."),
-        dict(Question_ID="BT-1", Option_ID="Condition A", Option_Text="Condition X", Is_Correct="TRUE", Rationale="Matches."),
-        dict(Question_ID="BT-1", Option_ID="Assessment i", Option_Text="Vitals", Is_Correct="TRUE", Rationale="Watch vitals."),
-        dict(Question_ID="CLZ-1", Option_ID="Option 1", Option_Text="call the provider", Is_Correct="TRUE", Rationale="Right."),
-        dict(Question_ID="CLZ-1", Option_ID="Option 2", Option_Text="do nothing", Is_Correct="FALSE", Rationale="Wrong."),
-        dict(Question_ID="EHS-1", Option_ID="Highlight 1", Option_Text="diaphoretic and pale", Is_Correct="TRUE", Rationale="Concerning."),
-        dict(Question_ID="DND-1", Option_ID="Step 1", Option_Text="First", Is_Correct="TRUE", Rationale="Goes first."),
-        dict(Question_ID="DND-1", Option_ID="Step 2", Option_Text="Second", Is_Correct="TRUE", Rationale="Goes second."),
+        dict(
+            Question_ID="MCQ-1", Option_ID="A", Option_Text="Right", Is_Correct="TRUE", Rationale="Because."
+        ),
+        dict(
+            Question_ID="MCQ-1", Option_ID="B", Option_Text="Wrong", Is_Correct="FALSE", Rationale="Not this."
+        ),
+        dict(
+            Question_ID="MTX-1",
+            Option_ID="Finding A",
+            Option_Text="Expected",
+            Is_Correct="TRUE",
+            Rationale="Normal.",
+        ),
+        dict(
+            Question_ID="MTX-1",
+            Option_ID="Finding B",
+            Option_Text="Unexpected",
+            Is_Correct="TRUE",
+            Rationale="Not normal.",
+        ),
+        dict(
+            Question_ID="BT-1",
+            Option_ID="Action 1",
+            Option_Text="Do X",
+            Is_Correct="TRUE",
+            Rationale="X helps.",
+        ),
+        dict(
+            Question_ID="BT-1",
+            Option_ID="Action 2",
+            Option_Text="Do Y",
+            Is_Correct="FALSE",
+            Rationale="Y doesn't.",
+        ),
+        dict(
+            Question_ID="BT-1",
+            Option_ID="Condition A",
+            Option_Text="Condition X",
+            Is_Correct="TRUE",
+            Rationale="Matches.",
+        ),
+        dict(
+            Question_ID="BT-1",
+            Option_ID="Assessment i",
+            Option_Text="Vitals",
+            Is_Correct="TRUE",
+            Rationale="Watch vitals.",
+        ),
+        dict(
+            Question_ID="CLZ-1",
+            Option_ID="Option 1",
+            Option_Text="call the provider",
+            Is_Correct="TRUE",
+            Rationale="Right.",
+        ),
+        dict(
+            Question_ID="CLZ-1",
+            Option_ID="Option 2",
+            Option_Text="do nothing",
+            Is_Correct="FALSE",
+            Rationale="Wrong.",
+        ),
+        dict(
+            Question_ID="EHS-1",
+            Option_ID="Highlight 1",
+            Option_Text="diaphoretic and pale",
+            Is_Correct="TRUE",
+            Rationale="Concerning.",
+        ),
+        dict(
+            Question_ID="DND-1",
+            Option_ID="Step 1",
+            Option_Text="First",
+            Is_Correct="TRUE",
+            Rationale="Goes first.",
+        ),
+        dict(
+            Question_ID="DND-1",
+            Option_ID="Step 2",
+            Option_Text="Second",
+            Is_Correct="TRUE",
+            Rationale="Goes second.",
+        ),
     ]
     _write_sheet(wb, "Answer_Options", ao_headers, ao_rows)
 
-    nc_headers = ["Case_ID", "Domain", "Body_System", "Topic/Subtopic", "Overall_Difficulty", "Reference_Key",
-                  "Case_Presentation_Hour0"]
-    _write_sheet(wb, "NGN_Cases", nc_headers, [
-        dict(Case_ID="CASE-1", Domain="Adult Health", Body_System="Cardiovascular", **{"Topic/Subtopic": "Heart Failure"},
-             Overall_Difficulty="Moderate", Reference_Key=None, Case_Presentation_Hour0="Hour 0 presentation."),
-    ])
+    nc_headers = [
+        "Case_ID",
+        "Domain",
+        "Body_System",
+        "Topic/Subtopic",
+        "Overall_Difficulty",
+        "Reference_Key",
+        "Case_Presentation_Hour0",
+    ]
+    _write_sheet(
+        wb,
+        "NGN_Cases",
+        nc_headers,
+        [
+            dict(
+                Case_ID="CASE-1",
+                Domain="Adult Health",
+                Body_System="Cardiovascular",
+                **{"Topic/Subtopic": "Heart Failure"},
+                Overall_Difficulty="Moderate",
+                Reference_Key=None,
+                Case_Presentation_Hour0="Hour 0 presentation.",
+            ),
+        ],
+    )
 
-    ncomp_headers = ["Case_ID", "Item_No", "Clinical_Judgment_Step", "Item_Type", "Item_Subtype_Detail",
-                      "Difficulty", "Cognitive_Level", "Domain", "Body_System", "Topic", "Subtopic",
-                      "Client_Needs_Category", "Client_Needs_Subcategory", "Reference_Key", "Updated_Exhibit",
-                      "Stem", "Correct_Answer", "Rationale", "Clinical_Tip"]
-    _write_sheet(wb, "NGN_Components", ncomp_headers, [
-        dict(Case_ID="CASE-1", Item_No=1, Clinical_Judgment_Step="Recognize Cues", Item_Type="MCQ",
-             Item_Subtype_Detail=None, Difficulty="Moderate", Cognitive_Level="Analyze", Domain=None,
-             Body_System=None, Topic=None, Subtopic=None, Client_Needs_Category="Physiological Integrity",
-             Client_Needs_Subcategory="Reduction of Risk Potential", Reference_Key=None,
-             Updated_Exhibit="Hour 0", Stem="A) foo B) bar", Correct_Answer="A", Rationale="Because A.",
-             Clinical_Tip=None),
-        dict(Case_ID="CASE-1", Item_No=2, Clinical_Judgment_Step="Take Action", Item_Type="SATA",
-             Item_Subtype_Detail=None, Difficulty="Moderate", Cognitive_Level="Apply", Domain=None,
-             Body_System=None, Topic=None, Subtopic=None, Client_Needs_Category="Physiological Integrity",
-             Client_Needs_Subcategory="Reduction of Risk Potential", Reference_Key=None,
-             Updated_Exhibit="Hour 1", Stem="A) foo B) bar C) baz", Correct_Answer="A, C", Rationale="Because.",
-             Clinical_Tip=None),
-    ])
+    ncomp_headers = [
+        "Case_ID",
+        "Item_No",
+        "Clinical_Judgment_Step",
+        "Item_Type",
+        "Item_Subtype_Detail",
+        "Difficulty",
+        "Cognitive_Level",
+        "Domain",
+        "Body_System",
+        "Topic",
+        "Subtopic",
+        "Client_Needs_Category",
+        "Client_Needs_Subcategory",
+        "Reference_Key",
+        "Updated_Exhibit",
+        "Stem",
+        "Correct_Answer",
+        "Rationale",
+        "Clinical_Tip",
+    ]
+    _write_sheet(
+        wb,
+        "NGN_Components",
+        ncomp_headers,
+        [
+            dict(
+                Case_ID="CASE-1",
+                Item_No=1,
+                Clinical_Judgment_Step="Recognize Cues",
+                Item_Type="MCQ",
+                Item_Subtype_Detail=None,
+                Difficulty="Moderate",
+                Cognitive_Level="Analyze",
+                Domain=None,
+                Body_System=None,
+                Topic=None,
+                Subtopic=None,
+                Client_Needs_Category="Physiological Integrity",
+                Client_Needs_Subcategory="Reduction of Risk Potential",
+                Reference_Key=None,
+                Updated_Exhibit="Hour 0",
+                Stem="A) foo B) bar",
+                Correct_Answer="A",
+                Rationale="Because A.",
+                Clinical_Tip=None,
+            ),
+            dict(
+                Case_ID="CASE-1",
+                Item_No=2,
+                Clinical_Judgment_Step="Take Action",
+                Item_Type="SATA",
+                Item_Subtype_Detail=None,
+                Difficulty="Moderate",
+                Cognitive_Level="Apply",
+                Domain=None,
+                Body_System=None,
+                Topic=None,
+                Subtopic=None,
+                Client_Needs_Category="Physiological Integrity",
+                Client_Needs_Subcategory="Reduction of Risk Potential",
+                Reference_Key=None,
+                Updated_Exhibit="Hour 1",
+                Stem="A) foo B) bar C) baz",
+                Correct_Answer="A, C",
+                Rationale="Because.",
+                Clinical_Tip=None,
+            ),
+        ],
+    )
 
     _write_sheet(wb, "References", ["Reference_Key", "Full_Citation"], [])
 
@@ -727,3 +892,479 @@ class ImportNgnItemBankTests(TestCase):
         self._run(_build_workbook(), dry_run=True)
         self.assertEqual(Question.objects.count(), 0)
         self.assertEqual(CaseStudy.objects.count(), 0)
+
+
+class AuthoringStructureValidationTests(TestCase):
+    """
+    Direct unit tests of apps.questions.authoring.validate_structure — one
+    per structural rule, independent of the admin serializer/HTTP layer
+    that also exercises it. Each of these corresponds to a question that
+    would otherwise save cleanly and then blow up at quiz time with
+    QuestionNotGradeable (apps.questions.services) — that's the whole
+    reason this validation exists.
+    """
+
+    def setUp(self):
+        from .authoring import validate_structure
+
+        self.validate_structure = validate_structure
+
+    def _validate(
+        self, effective_type, structure, stem="Stem text.", clinical_scenario=None, case_scenario=None
+    ):
+        self.validate_structure(
+            effective_type=effective_type,
+            stem=stem,
+            clinical_scenario=clinical_scenario,
+            case_scenario=case_scenario,
+            structure=structure,
+        )
+
+    # --- MCQ / SATA / EMR ---
+
+    def test_mcq_with_two_correct_choices_is_rejected(self):
+        from .authoring import StructureError
+
+        choices = [
+            {"choice_text": "A", "is_correct": True, "display_order": 0, "rationale": ""},
+            {"choice_text": "B", "is_correct": True, "display_order": 1, "rationale": ""},
+        ]
+        with self.assertRaises(StructureError):
+            self._validate(QuestionType.MCQ, {"answer_choices": choices})
+
+    def test_sata_with_zero_correct_choices_is_rejected(self):
+        from .authoring import StructureError
+
+        choices = [
+            {"choice_text": "A", "is_correct": False, "display_order": 0, "rationale": ""},
+            {"choice_text": "B", "is_correct": False, "display_order": 1, "rationale": ""},
+        ]
+        with self.assertRaises(StructureError):
+            self._validate(QuestionType.SATA, {"answer_choices": choices})
+
+    def test_sata_with_one_choice_is_rejected(self):
+        from .authoring import StructureError
+
+        choices = [{"choice_text": "A", "is_correct": True, "display_order": 0, "rationale": ""}]
+        with self.assertRaises(StructureError):
+            self._validate(QuestionType.SATA, {"answer_choices": choices})
+
+    def test_duplicate_display_order_is_rejected(self):
+        from .authoring import StructureError
+
+        choices = [
+            {"choice_text": "A", "is_correct": True, "display_order": 0, "rationale": ""},
+            {"choice_text": "B", "is_correct": False, "display_order": 0, "rationale": ""},
+        ]
+        with self.assertRaises(StructureError):
+            self._validate(QuestionType.MCQ, {"answer_choices": choices})
+
+    def test_valid_mcq_passes(self):
+        choices = [
+            {"choice_text": "A", "is_correct": True, "display_order": 0, "rationale": ""},
+            {"choice_text": "B", "is_correct": False, "display_order": 1, "rationale": ""},
+        ]
+        self._validate(QuestionType.MCQ, {"answer_choices": choices})  # no exception
+
+    # --- MATRIX ---
+
+    def _matrix_structure(self, **overrides):
+        columns = [
+            {"key": "c0", "text": "Expected", "display_order": 0},
+            {"key": "c1", "text": "Unexpected", "display_order": 1},
+        ]
+        rows = [
+            {
+                "key": "r0",
+                "text": "BP 88/54",
+                "display_order": 0,
+                "cells": [
+                    {"column_key": "c0", "is_correct": False, "rationale": ""},
+                    {"column_key": "c1", "is_correct": True, "rationale": ""},
+                ],
+            }
+        ]
+        structure = {"matrix_columns": columns, "matrix_rows": rows}
+        structure.update(overrides)
+        return structure
+
+    def test_matrix_row_with_no_correct_cell_is_rejected(self):
+        from .authoring import StructureError
+
+        structure = self._matrix_structure()
+        structure["matrix_rows"][0]["cells"][1]["is_correct"] = False
+        with self.assertRaises(StructureError):
+            self._validate(QuestionType.MATRIX, structure)
+
+    def test_matrix_row_missing_a_cell_for_one_column_is_rejected(self):
+        from .authoring import StructureError
+
+        structure = self._matrix_structure()
+        structure["matrix_rows"][0]["cells"].pop()
+        with self.assertRaises(StructureError):
+            self._validate(QuestionType.MATRIX, structure)
+
+    def test_matrix_cell_with_unresolvable_column_key_is_rejected(self):
+        from .authoring import StructureError
+
+        structure = self._matrix_structure()
+        structure["matrix_rows"][0]["cells"][0]["column_key"] = "does-not-exist"
+        with self.assertRaises(StructureError):
+            self._validate(QuestionType.MATRIX, structure)
+
+    def test_matrix_with_fewer_than_two_columns_is_rejected(self):
+        from .authoring import StructureError
+
+        structure = self._matrix_structure()
+        structure["matrix_columns"].pop()
+        structure["matrix_rows"][0]["cells"].pop()
+        with self.assertRaises(StructureError):
+            self._validate(QuestionType.MATRIX, structure)
+
+    def test_valid_matrix_passes(self):
+        self._validate(QuestionType.MATRIX, self._matrix_structure())  # no exception
+
+    # --- BOWTIE ---
+
+    def _bowtie_structure(self, **overrides):
+        options = [
+            {
+                "section": "ASSESSMENT",
+                "option_text": "Crackles",
+                "is_correct": True,
+                "display_order": 0,
+                "rationale": "",
+            },
+            {
+                "section": "CONDITION",
+                "option_text": "Fluid overload",
+                "is_correct": True,
+                "display_order": 0,
+                "rationale": "",
+            },
+            {
+                "section": "ACTION",
+                "option_text": "Give furosemide",
+                "is_correct": True,
+                "display_order": 0,
+                "rationale": "",
+            },
+        ]
+        structure = {"bowtie_options": options}
+        structure.update(overrides)
+        return structure
+
+    def test_bowtie_section_with_no_correct_option_is_rejected(self):
+        from .authoring import StructureError
+
+        structure = self._bowtie_structure()
+        structure["bowtie_options"][0]["is_correct"] = False
+        with self.assertRaises(StructureError):
+            self._validate(QuestionType.BOWTIE, structure)
+
+    def test_bowtie_missing_a_section_entirely_is_rejected(self):
+        from .authoring import StructureError
+
+        structure = self._bowtie_structure()
+        structure["bowtie_options"] = [o for o in structure["bowtie_options"] if o["section"] != "ACTION"]
+        with self.assertRaises(StructureError):
+            self._validate(QuestionType.BOWTIE, structure)
+
+    def test_valid_bowtie_passes(self):
+        self._validate(QuestionType.BOWTIE, self._bowtie_structure())  # no exception
+
+    # --- CLOZE ---
+
+    def _cloze_structure(self, stem="The nurse should assess the client's [dropdown 1] first."):
+        blanks = [
+            {
+                "blank_key": "dropdown 1",
+                "display_order": 0,
+                "options": [
+                    {"option_text": "airway", "is_correct": True, "rationale": ""},
+                    {"option_text": "temperature", "is_correct": False, "rationale": ""},
+                ],
+            }
+        ]
+        return {"cloze_blanks": blanks}, stem
+
+    def test_cloze_blank_key_with_no_stem_placeholder_is_rejected(self):
+        from .authoring import StructureError
+
+        structure, _ = self._cloze_structure()
+        with self.assertRaises(StructureError):
+            self._validate(QuestionType.CLOZE, structure, stem="No placeholders here.")
+
+    def test_cloze_stem_placeholder_with_no_matching_blank_is_rejected(self):
+        from .authoring import StructureError
+
+        structure, stem = self._cloze_structure(
+            stem="The nurse should assess the client's [dropdown 1] and [dropdown 2]."
+        )
+        with self.assertRaises(StructureError):
+            self._validate(QuestionType.CLOZE, structure, stem=stem)
+
+    def test_cloze_blank_with_zero_correct_options_is_rejected(self):
+        from .authoring import StructureError
+
+        structure, stem = self._cloze_structure()
+        structure["cloze_blanks"][0]["options"][0]["is_correct"] = False
+        with self.assertRaises(StructureError):
+            self._validate(QuestionType.CLOZE, structure, stem=stem)
+
+    def test_duplicate_blank_key_is_rejected(self):
+        from .authoring import StructureError
+
+        structure, stem = self._cloze_structure(stem="Assess [dropdown 1] and [DROPDOWN 1].")
+        structure["cloze_blanks"].append(
+            {
+                "blank_key": "DROPDOWN 1",
+                "display_order": 1,
+                "options": [
+                    {"option_text": "x", "is_correct": True, "rationale": ""},
+                    {"option_text": "y", "is_correct": False, "rationale": ""},
+                ],
+            }
+        )
+        with self.assertRaises(StructureError):
+            self._validate(QuestionType.CLOZE, structure, stem=stem)
+
+    def test_valid_cloze_passes(self):
+        structure, stem = self._cloze_structure()
+        self._validate(QuestionType.CLOZE, structure, stem=stem)  # no exception
+
+    # --- DRAG_DROP ---
+
+    def test_dragdrop_item_with_unresolvable_category_key_is_rejected(self):
+        from .authoring import StructureError
+
+        structure = {
+            "dragdrop_categories": [{"key": "cat0", "name": "Expected", "display_order": 0}],
+            "dragdrop_items": [
+                {
+                    "text": "Item",
+                    "display_order": 0,
+                    "correct_category_key": "does-not-exist",
+                    "correct_order": None,
+                    "rationale": "",
+                }
+            ],
+        }
+        with self.assertRaises(StructureError):
+            self._validate(QuestionType.DRAG_DROP, structure)
+
+    def test_dragdrop_item_with_both_category_and_order_is_rejected(self):
+        from .authoring import StructureError
+
+        structure = {
+            "dragdrop_categories": [{"key": "cat0", "name": "Expected", "display_order": 0}],
+            "dragdrop_items": [
+                {
+                    "text": "Item",
+                    "display_order": 0,
+                    "correct_category_key": "cat0",
+                    "correct_order": 1,
+                    "rationale": "",
+                }
+            ],
+        }
+        with self.assertRaises(StructureError):
+            self._validate(QuestionType.DRAG_DROP, structure)
+
+    def test_dragdrop_sequencing_with_gap_in_order_is_rejected(self):
+        from .authoring import StructureError
+
+        structure = {
+            "dragdrop_categories": [],
+            "dragdrop_items": [
+                {
+                    "text": "Step 1",
+                    "display_order": 0,
+                    "correct_category_key": None,
+                    "correct_order": 1,
+                    "rationale": "",
+                },
+                {
+                    "text": "Step 2",
+                    "display_order": 1,
+                    "correct_category_key": None,
+                    "correct_order": 4,
+                    "rationale": "",
+                },
+            ],
+        }
+        with self.assertRaises(StructureError):
+            self._validate(QuestionType.DRAG_DROP, structure)
+
+    def test_valid_dragdrop_category_variant_passes(self):
+        structure = {
+            "dragdrop_categories": [{"key": "cat0", "name": "Expected", "display_order": 0}],
+            "dragdrop_items": [
+                {
+                    "text": "Item",
+                    "display_order": 0,
+                    "correct_category_key": "cat0",
+                    "correct_order": None,
+                    "rationale": "",
+                }
+            ],
+        }
+        self._validate(QuestionType.DRAG_DROP, structure)  # no exception
+
+    def test_valid_dragdrop_sequencing_variant_passes(self):
+        structure = {
+            "dragdrop_categories": [],
+            "dragdrop_items": [
+                {
+                    "text": "Step 1",
+                    "display_order": 0,
+                    "correct_category_key": None,
+                    "correct_order": 1,
+                    "rationale": "",
+                },
+                {
+                    "text": "Step 2",
+                    "display_order": 1,
+                    "correct_category_key": None,
+                    "correct_order": 2,
+                    "rationale": "",
+                },
+            ],
+        }
+        self._validate(QuestionType.DRAG_DROP, structure)  # no exception
+
+    # --- HOTSPOT ---
+
+    def test_hotspot_target_absent_from_stem_is_rejected(self):
+        from .authoring import StructureError
+
+        structure = {
+            "hotspot_targets": [
+                {"target_text": "not in the stem", "is_correct": True, "display_order": 0, "rationale": ""}
+            ]
+        }
+        with self.assertRaises(StructureError):
+            self._validate(QuestionType.HOTSPOT, structure, stem="A client is diaphoretic and pale.")
+
+    def test_hotspot_target_over_255_chars_is_rejected(self):
+        from .authoring import StructureError
+
+        long_text = "A" * 256
+        structure = {
+            "hotspot_targets": [
+                {"target_text": long_text, "is_correct": True, "display_order": 0, "rationale": ""}
+            ]
+        }
+        with self.assertRaises(StructureError):
+            self._validate(QuestionType.HOTSPOT, structure, stem=long_text)
+
+    def test_hotspot_with_zero_correct_targets_is_rejected(self):
+        from .authoring import StructureError
+
+        structure = {
+            "hotspot_targets": [
+                {"target_text": "diaphoretic", "is_correct": False, "display_order": 0, "rationale": ""}
+            ]
+        }
+        with self.assertRaises(StructureError):
+            self._validate(QuestionType.HOTSPOT, structure, stem="A client is diaphoretic and pale.")
+
+    def test_valid_hotspot_passes(self):
+        structure = {
+            "hotspot_targets": [
+                {"target_text": "diaphoretic", "is_correct": True, "display_order": 0, "rationale": ""}
+            ]
+        }
+        self._validate(
+            QuestionType.HOTSPOT, structure, stem="A client is diaphoretic and pale."
+        )  # no exception
+
+
+class NgnItemBankImporterDirectTests(TestCase):
+    """
+    Calls apps.questions.importer.NgnItemBankImporter directly (bypassing
+    the management command entirely) — proves the extraction in Phase 6 of
+    the implementation plan produces a genuinely reusable class, not just
+    one that happens to still work through call_command.
+    """
+
+    def setUp(self):
+        nursing_system, _ = NursingSystem.objects.get_or_create(name="Cardiovascular")
+        Topic.objects.get_or_create(nursing_system=nursing_system, name="Heart Failure")
+        Domain.objects.get_or_create(name="Adult Health")
+        category, _ = ClientNeedsCategory.objects.get_or_create(name="Physiological Integrity")
+        ClientNeedsSubcategory.objects.get_or_create(category=category, name="Reduction of Risk Potential")
+
+    def _save_and_reopen(self, wb):
+        import tempfile
+
+        f = tempfile.NamedTemporaryFile(suffix=".xlsx", delete=False)
+        wb.save(f.name)
+        f.close()
+        return f.name
+
+    def test_run_returns_structured_result_matching_the_workbook(self):
+        from apps.questions.importer import NgnItemBankImporter
+
+        path = self._save_and_reopen(_build_workbook())
+        result = NgnItemBankImporter().run(path)
+
+        # 6 top-level questions (MCQ/MTX/BT/CLZ/EHS/DND) + 2 case-study items.
+        self.assertEqual(result.created, 8)
+        self.assertEqual(result.case_studies_created, 1)
+        self.assertEqual(result.questions_imported, result.created + result.updated)
+        self.assertEqual(result.rows_failed, 0)
+        self.assertFalse(result.dry_run)
+
+    def test_run_reports_row_errors_with_labels(self):
+        from apps.questions.importer import NgnItemBankImporter
+
+        wb = _build_workbook()
+        ws = wb["Answer_Options"]
+        ws.append(["EHS-1", "this text is not in the stem at all", "TRUE", "Ambiguous."])
+        path = self._save_and_reopen(wb)
+
+        result = NgnItemBankImporter().run(path)
+        self.assertEqual(result.rows_failed, 1)
+        self.assertEqual(result.errors[0].label, "EHS-1")
+        self.assertIn("does not appear verbatim", result.errors[0].message)
+
+    def test_dry_run_writes_nothing_and_result_says_so(self):
+        from apps.questions.importer import NgnItemBankImporter
+
+        path = self._save_and_reopen(_build_workbook())
+        result = NgnItemBankImporter(dry_run=True).run(path)
+
+        self.assertTrue(result.dry_run)
+        self.assertEqual(Question.objects.count(), 0)
+        self.assertGreater(result.created, 0)  # still reports what WOULD have been created
+
+
+class WriteImportLogTests(TestCase):
+    def setUp(self):
+        nursing_system, _ = NursingSystem.objects.get_or_create(name="Cardiovascular")
+        Topic.objects.get_or_create(nursing_system=nursing_system, name="Heart Failure")
+        Domain.objects.get_or_create(name="Adult Health")
+        category, _ = ClientNeedsCategory.objects.get_or_create(name="Physiological Integrity")
+        ClientNeedsSubcategory.objects.get_or_create(category=category, name="Reduction of Risk Potential")
+
+    def test_command_line_run_writes_a_log_with_null_uploader(self):
+        from apps.questions.models import ImportLog
+
+        with tempfile.NamedTemporaryFile(suffix=".xlsx") as f:
+            _build_workbook().save(f.name)
+            call_command("import_ngn_item_bank", file=f.name)
+
+        log = ImportLog.objects.latest("uploaded_at")
+        self.assertIsNone(log.uploaded_by)
+        self.assertGreater(log.questions_imported, 0)
+        self.assertEqual(log.rows_failed, 0)
+
+    def test_dry_run_does_not_write_a_log(self):
+        from apps.questions.models import ImportLog
+
+        with tempfile.NamedTemporaryFile(suffix=".xlsx") as f:
+            _build_workbook().save(f.name)
+            call_command("import_ngn_item_bank", file=f.name, dry_run=True)
+
+        self.assertEqual(ImportLog.objects.count(), 0)

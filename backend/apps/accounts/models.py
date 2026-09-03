@@ -65,6 +65,11 @@ class UserManager(BaseUserManager):
         extra_fields.setdefault(
             "is_active", True
         )  # superusers created via `createsuperuser` should be able to log in immediately, bypassing the normal email-verification gate
+        # Keeps User.role in sync with is_superuser for any account created
+        # through this path (createsuperuser, ensure_superuser) — without
+        # this, a freshly created superuser would default to role=STUDENT
+        # and be rejected by IsSuperuser until someone manually fixed it.
+        extra_fields.setdefault("role", UserRole.SUPERUSER)
 
         if extra_fields.get("is_staff") is not True:
             raise ValueError("Superuser must have is_staff=True")
@@ -74,6 +79,20 @@ class UserManager(BaseUserManager):
         # Delegates to create_user for the actual construction/hashing/save,
         # so there's exactly one code path that creates a User row.
         return self.create_user(email, password, **extra_fields)
+
+
+class UserRole(models.TextChoices):
+    """
+    Who a user is on the platform, orthogonal to is_staff/is_superuser
+    (which govern access to the Django admin *site*, not this API or the
+    custom React admin dashboard). Values are uppercase to match every
+    other TextChoices in this project (SubscriptionStatus.FREE,
+    Difficulty.EASY, ReportStatus.OPEN).
+    """
+
+    STUDENT = "STUDENT", "Student"
+    CONTENT_ADMIN = "CONTENT_ADMIN", "Content admin"
+    SUPERUSER = "SUPERUSER", "Superuser"
 
 
 class SubscriptionStatus(models.TextChoices):
@@ -129,6 +148,13 @@ class User(UUIDPKMixin, AbstractBaseUser, PermissionsMixin):
     subscription_status = models.CharField(
         max_length=20, choices=SubscriptionStatus.choices, default=SubscriptionStatus.FREE
     )
+
+    # First-class authorization role for the custom admin dashboard
+    # (apps.admin_api) — replaces ad-hoc is_staff/is_superuser checks for
+    # anything beyond the Django admin site. db_index=True because the
+    # business-analytics dashboard filters role=STUDENT on every load
+    # against a table with no natural upper bound.
+    role = models.CharField(max_length=20, choices=UserRole.choices, default=UserRole.STUDENT, db_index=True)
 
     # Legal/liability record: proves a specific student affirmatively
     # acknowledged the NCLEX Examination Disclaimer (that NextWise provides
