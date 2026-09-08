@@ -119,7 +119,20 @@ export function QuizFeedbackModal({ open, onOpenChange, questionCount }: QuizFee
     // explicit Submit or Skip actions below, not Escape or an outside press.
     <Dialog open={open} onOpenChange={() => {}} disablePointerDismissal>
       <DialogContent className="max-h-[85vh] overflow-y-auto sm:max-w-lg" showCloseButton={false}>
-        <DialogHeader>
+        {/* Top-right, same spot the built-in close button would occupy —
+            skipping the survey shouldn't require scrolling past the whole
+            form to reach the footer. */}
+        <Button
+          type="button"
+          variant="ghost"
+          size="sm"
+          className="absolute top-3 right-3 text-muted-foreground"
+          onClick={handleSkip}
+          disabled={submitting}
+        >
+          Skip
+        </Button>
+        <DialogHeader className="pr-12">
           <DialogTitle>After-Quiz Feedback</DialogTitle>
           <DialogDescription>Help us improve NextWise. This takes about a minute.</DialogDescription>
         </DialogHeader>
@@ -213,9 +226,6 @@ export function QuizFeedbackModal({ open, onOpenChange, questionCount }: QuizFee
         </div>
 
         <DialogFooter>
-          <Button variant="outline" onClick={handleSkip} disabled={submitting}>
-            Skip
-          </Button>
           <Button onClick={handleSubmit} disabled={submitting}>
             {submitting ? "Submitting…" : "Submit feedback"}
           </Button>
