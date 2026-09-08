@@ -1,7 +1,7 @@
 import { useMutation, useQuery } from "@tanstack/react-query";
 import { Bookmark, BookmarkCheck, ChevronLeft, ChevronRight } from "lucide-react";
 import { useEffect, useReducer, useRef } from "react";
-import { Navigate, useLocation, useNavigate } from "react-router-dom";
+import { Navigate, useLocation, useNavigate, useNavigationType } from "react-router-dom";
 import { toast } from "sonner";
 
 import { FullPageSpinner } from "@/components/common/LoadingSpinner";
@@ -30,34 +30,42 @@ interface LocationState {
   session: QuizSessionData;
 }
 
-// A real browser reload does NOT clear React Router's location.state — the
-// state object lives on the session-history entry itself (window.history.
-// state), and Chrome/Firefox both keep that entry's state exactly as it was
-// across a reload. So `location.state` alone cannot tell "just navigated
-// here from Generate Quiz" apart from "reloaded a tab that navigated here
-// an hour ago" — it would otherwise resurrect whatever stale snapshot
-// (empty responses, question_index frozen at 0) existed at the moment the
-// student first arrived, no matter how far they'd since progressed.
-// performance.getEntriesByType("navigation")[0].type is the browser's own
-// answer to "was THIS load a reload" (Navigation Timing Level 2, universal
-// in evergreen browsers) — computed once per page load, which is exactly
-// the granularity that matters here.
-const IS_RELOAD =
-  typeof performance !== "undefined" &&
-  (performance.getEntriesByType("navigation")[0] as PerformanceNavigationTiming | undefined)?.type === "reload";
-
 export function QuizSessionPage() {
   const location = useLocation();
   const state = location.state as LocationState | null;
-  const hasLocationSession = !IS_RELOAD && Boolean(state?.session?.questions?.length);
+  // A real browser reload does NOT clear React Router's location.state —
+  // the state object lives on the session-history entry itself (window.
+  // history.state), and Chrome/Firefox both keep that entry's state exactly
+  // as it was across a reload. So `location.state`'s mere presence can't
+  // tell "just navigated here from Generate Quiz" apart from "reloaded a
+  // tab that navigated here an hour ago" — it would otherwise resurrect
+  // whatever stale snapshot (empty responses, question_index frozen at 0)
+  // existed at the moment the student first arrived.
+  //
+  // useNavigationType() is the correct signal instead of trying to detect
+  // "was the page reloaded" (e.g. via the Navigation Timing API): it's
+  // "PUSH" only for a location reached via an actual navigate(path, {state})
+  // call — exactly what QuizSetupPage's "Generate Quiz" and the resume
+  // prompt's "Yes, continue" both do — and "POP" for the very first render
+  // after any real page load (fresh nav OR reload) as well as browser back/
+  // forward. A whole-tab-lifetime reload flag was tried here before and
+  // caused a real bug: computed once, it stayed "true" for the rest of the
+  // tab's session after any actual reload anywhere in the app (even on an
+  // unrelated page), permanently breaking every LATER "Generate Quiz" click
+  // in that tab — Generate Quiz would create the session server-side (so a
+  // refresh afterward correctly offered to resume it) but never actually
+  // navigate the student into it. useNavigationType() doesn't have that
+  // problem: it's evaluated fresh on every render, per location entry.
+  const navigationType = useNavigationType();
+  const hasLocationSession = navigationType === "PUSH" && Boolean(state?.session?.questions?.length);
 
   // No usable location.state means this render did NOT come from "Generate
   // Quiz" or the resume prompt handing off a session directly — either a
-  // genuine reload (IS_RELOAD, handled above) or a direct/bookmarked visit.
-  // Falls back to re-fetching the session from the server (sessionStorage's
-  // id — see lib/activeQuizSession.ts) so the student lands back on the
-  // question they were actually on, with up-to-date answers, not a stale
-  // snapshot from whenever they first navigated in.
+  // genuine reload/direct visit ("POP", handled above) or back/forward
+  // navigation. Falls back to re-fetching the session from the server
+  // (sessionStorage's id — see lib/activeQuizSession.ts) so the student
+  // lands back on the question they were actually on, with up-to-date
+  // answers, not a stale snapshot from whenever they first navigated in.
   const storedSessionId = hasLocationSession ? null : getActiveQuizSessionId();
 
   const resumeQuery = useQuery({

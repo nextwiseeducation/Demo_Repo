@@ -12,6 +12,7 @@ import { Label } from "@/components/ui/label";
 import { Switch } from "@/components/ui/switch";
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import { useDebouncedValue } from "@/hooks/useDebouncedValue";
+import { setActiveQuizSessionId } from "@/lib/activeQuizSession";
 import * as quizzesApi from "@/lib/api/quizzes";
 import { ROUTES } from "@/lib/constants";
 import { QUESTION_MODE_STATUS_LABELS, type QuestionFormat, type QuestionModeStatus, type QuizFilters } from "@/types/quiz";
@@ -58,7 +59,16 @@ export function QuizSetupPage() {
 
   const createMutation = useMutation({
     mutationFn: quizzesApi.createQuizSession,
-    onSuccess: (session) => navigate(ROUTES.quizSession, { state: { session } }),
+    onSuccess: (session) => {
+      // Set here too, not just in QuizSessionInner's own mount effect
+      // (QuizSessionPage.tsx) — belt and suspenders: if the freshly-pushed
+      // location.state ever fails to be recognized as fresh for any reason,
+      // QuizSessionPage's fallback path (re-fetch by sessionStorage id)
+      // still lands the student in the quiz it just created rather than
+      // bouncing them back here having created a session they can't reach.
+      setActiveQuizSessionId(session.id);
+      navigate(ROUTES.quizSession, { state: { session } });
+    },
   });
 
   function toggleQuestionType(format: QuestionFormat) {
