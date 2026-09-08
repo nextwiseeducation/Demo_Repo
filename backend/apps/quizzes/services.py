@@ -92,13 +92,15 @@ def annotate_student_status(qs: QuerySet, student) -> QuerySet:
         has_response=Exists(responses),
         latest_is_correct=Subquery(latest_response.values("is_correct")[:1], output_field=BooleanField()),
         # OMITTED, precisely: no response from this student exists, but the
-        # question was served as part of a quiz session this student
-        # actually finished. Realistically ~0 today — the live quiz flow
-        # has no skip/abandon action, only forced submit-then-next — but
-        # defined correctly now so the day that action exists, no further
-        # schema/query change is needed here.
+        # question was served as part of a quiz session this student either
+        # finished (is_complete) or gave up on when prompted to resume it
+        # after a fresh login (is_abandoned — see QuizSessionActiveView /
+        # QuizSessionAbandonView). Either way the student is not coming back
+        # to answer it in that session.
         is_omitted_eligible=Exists(
-            QuizSession.objects.filter(student=student, is_complete=True, questions=OuterRef("pk"))
+            QuizSession.objects.filter(
+                student=student, questions=OuterRef("pk")
+            ).filter(Q(is_complete=True) | Q(is_abandoned=True))
         ),
     )
     return qs.annotate(

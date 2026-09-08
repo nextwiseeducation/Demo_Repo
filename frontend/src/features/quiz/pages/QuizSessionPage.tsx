@@ -1,8 +1,9 @@
-import { useMutation } from "@tanstack/react-query";
+import { useMutation, useQuery } from "@tanstack/react-query";
 import { Bookmark, BookmarkCheck } from "lucide-react";
 import { useEffect, useReducer, useRef } from "react";
 import { Navigate, useLocation, useNavigate } from "react-router-dom";
 
+import { FullPageSpinner } from "@/components/common/LoadingSpinner";
 import { Button } from "@/components/ui/button";
 import { BowTieQuestion } from "@/features/quiz/components/BowTieQuestion";
 import { ClozeQuestion } from "@/features/quiz/components/ClozeQuestion";
@@ -17,6 +18,7 @@ import { QuizProgressBar } from "@/features/quiz/components/QuizProgressBar";
 import { SATAChoiceList } from "@/features/quiz/components/SATAChoiceList";
 import { UnsupportedQuestionTypeNotice } from "@/features/quiz/components/UnsupportedQuestionTypeNotice";
 import { createInitialState, quizSessionReducer, type AnswerState } from "@/features/quiz/quizSessionReducer";
+import { clearActiveQuizSessionId, getActiveQuizSessionId, setActiveQuizSessionId } from "@/lib/activeQuizSession";
 import * as quizzesApi from "@/lib/api/quizzes";
 import { ROUTES } from "@/lib/constants";
 import { effectiveQuestionType, SUPPORTED_QUESTION_TYPES, type Question } from "@/types/question";
@@ -29,18 +31,45 @@ interface LocationState {
 export function QuizSessionPage() {
   const location = useLocation();
   const state = location.state as LocationState | null;
+  const hasLocationSession = Boolean(state?.session?.questions?.length);
 
-  // The session itself now lives server-side (a real QuizSession +
-  // StudentResponseLog rows, written as each answer is submitted below) —
-  // what's carried here is just the already-created session's id +
-  // ordered questions, handed off from QuizSetupPage's "Generate Quiz".
-  // There's no GET-by-id endpoint yet, so a direct refresh/link still has
-  // nothing to resume from and bounces to setup, same as before.
-  if (!state?.session?.questions?.length) {
-    return <Navigate to={ROUTES.quizSetup} replace />;
+  // No location.state means this render did NOT come from "Generate Quiz"
+  // or the resume prompt handing off a session directly — most commonly a
+  // page refresh while mid-quiz, since that wipes React Router's in-memory
+  // state but not sessionStorage (see lib/activeQuizSession.ts). Falls back
+  // to re-fetching that same session from the server so the student lands
+  // back on the question they were on, instead of bouncing to quiz setup.
+  const storedSessionId = hasLocationSession ? null : getActiveQuizSessionId();
+
+  const resumeQuery = useQuery({
+    queryKey: ["quiz-session-resume", storedSessionId],
+    queryFn: () => quizzesApi.getQuizSession(storedSessionId as string),
+    enabled: Boolean(storedSessionId),
+    retry: false,
+  });
+
+  // A stored id that turns out to be stale (session already finished, or
+  // the fetch itself failed — e.g. it belonged to a different account)
+  // must not keep sending the student back here on every future load.
+  const resumeIsStale =
+    resumeQuery.isError || (resumeQuery.isSuccess && (resumeQuery.data.is_complete || resumeQuery.data.questions.length === 0));
+
+  useEffect(() => {
+    if (storedSessionId && resumeIsStale) clearActiveQuizSessionId();
+  }, [storedSessionId, resumeIsStale]);
+
+  if (hasLocationSession) {
+    return <QuizSessionInner quizSession={state!.session} />;
   }
 
-  return <QuizSessionInner quizSession={state.session} />;
+  if (storedSessionId) {
+    if (resumeQuery.isPending) return <FullPageSpinner label="Resuming your quiz..." />;
+    if (resumeQuery.isSuccess && !resumeIsStale) {
+      return <QuizSessionInner quizSession={resumeQuery.data} />;
+    }
+  }
+
+  return <Navigate to={ROUTES.quizSetup} replace />;
 }
 
 /**
@@ -129,7 +158,18 @@ function buildSubmitFields(question: Question, answer: AnswerState) {
 
 function QuizSessionInner({ quizSession }: { quizSession: QuizSessionData }) {
   const navigate = useNavigate();
-  const [session, dispatch] = useReducer(quizSessionReducer, createInitialState(quizSession.questions));
+  const [session, dispatch] = useReducer(
+    quizSessionReducer,
+    createInitialState(quizSession.questions, quizSession.current_question_index),
+  );
+
+  // Marks this session as the one to silently resume into on a same-tab
+  // refresh (see lib/activeQuizSession.ts) — set unconditionally on mount
+  // so it covers every path that can land here: a fresh "Generate Quiz", a
+  // resume-prompt handoff, and a resume-from-refresh all converge here.
+  useEffect(() => {
+    setActiveQuizSessionId(quizSession.id);
+  }, [quizSession.id]);
   // Wall-clock start of this session — diffed at finish to report total
   // time spent to the results page. A ref (not state) since it's write-once
   // and reading it never needs to trigger a re-render.
@@ -202,6 +242,9 @@ function QuizSessionInner({ quizSession }: { quizSession: QuizSessionData }) {
         };
       });
       const totalTimeSeconds = Math.round((Date.now() - startedAtRef.current) / 1000);
+      // Nothing left to resume into — a refresh from here on should land on
+      // quiz setup, not try to re-open this now-finished session.
+      clearActiveQuizSessionId();
       navigate(ROUTES.quizResults, {
         state: { questions: session.questions, responses, totalTimeSeconds },
       });

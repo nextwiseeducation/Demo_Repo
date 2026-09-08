@@ -261,6 +261,101 @@ class QuizAnswerSubmitAPITests(APITestCase):
         self.assertEqual(response.status_code, status.HTTP_404_NOT_FOUND)
 
 
+class QuizSessionRetrieveAPITests(APITestCase):
+    """GET /api/quizzes/sessions/<id>/ — the refresh-resume lookup."""
+
+    def setUp(self):
+        self.user = User.objects.create_user(email="retrieve@example.com", password="a-strong-password-123")
+        self.other_user = User.objects.create_user(email="retrieve-other@example.com", password="a-strong-password-123")
+        self.client.force_authenticate(self.user)
+        self.question = make_question()
+        self.session = QuizSession.objects.create(student=self.user)
+        QuizSessionQuestion.objects.create(quiz_session=self.session, question=self.question, position=0)
+
+    def test_returns_the_session_with_its_ordered_questions(self):
+        response = self.client.get(reverse("quiz-session-retrieve", args=[self.session.pk]))
+        self.assertEqual(response.status_code, status.HTTP_200_OK)
+        self.assertEqual(response.data["id"], str(self.session.pk))
+        self.assertEqual(len(response.data["questions"]), 1)
+
+    def test_cannot_retrieve_another_students_session(self):
+        self.client.force_authenticate(self.other_user)
+        response = self.client.get(reverse("quiz-session-retrieve", args=[self.session.pk]))
+        # 404, not 403 — same reasoning as QuizAnswerSubmitView.
+        self.assertEqual(response.status_code, status.HTTP_404_NOT_FOUND)
+
+
+class QuizSessionActiveAPITests(APITestCase):
+    """GET /api/quizzes/sessions/active/ — what powers the post-login resume prompt."""
+
+    def setUp(self):
+        self.user = User.objects.create_user(email="active@example.com", password="a-strong-password-123")
+        self.client.force_authenticate(self.user)
+        self.question = make_question()
+
+    def test_no_sessions_returns_null(self):
+        response = self.client.get(reverse("quiz-session-active"))
+        self.assertEqual(response.status_code, status.HTTP_200_OK)
+        self.assertIsNone(response.data["session"])
+
+    def test_returns_an_in_progress_session(self):
+        session = QuizSession.objects.create(student=self.user)
+        QuizSessionQuestion.objects.create(quiz_session=session, question=self.question, position=0)
+
+        response = self.client.get(reverse("quiz-session-active"))
+
+        self.assertIsNotNone(response.data["session"])
+        self.assertEqual(response.data["session"]["id"], str(session.pk))
+
+    def test_completed_sessions_are_not_returned(self):
+        session = QuizSession.objects.create(student=self.user, is_complete=True)
+        QuizSessionQuestion.objects.create(quiz_session=session, question=self.question, position=0)
+
+        response = self.client.get(reverse("quiz-session-active"))
+
+        self.assertIsNone(response.data["session"])
+
+    def test_abandoned_sessions_are_not_returned(self):
+        session = QuizSession.objects.create(student=self.user, is_abandoned=True)
+        QuizSessionQuestion.objects.create(quiz_session=session, question=self.question, position=0)
+
+        response = self.client.get(reverse("quiz-session-active"))
+
+        self.assertIsNone(response.data["session"])
+
+
+class QuizSessionAbandonAPITests(APITestCase):
+    """POST /api/quizzes/sessions/<id>/abandon/ — declining the resume prompt."""
+
+    def setUp(self):
+        self.user = User.objects.create_user(email="abandon@example.com", password="a-strong-password-123")
+        self.other_user = User.objects.create_user(email="abandon-other@example.com", password="a-strong-password-123")
+        self.client.force_authenticate(self.user)
+        self.question = make_question()
+        self.session = QuizSession.objects.create(student=self.user)
+        QuizSessionQuestion.objects.create(quiz_session=self.session, question=self.question, position=0)
+
+    def test_marks_the_session_abandoned_without_marking_it_complete(self):
+        response = self.client.post(reverse("quiz-session-abandon", args=[self.session.pk]))
+        self.assertEqual(response.status_code, status.HTTP_204_NO_CONTENT)
+
+        self.session.refresh_from_db()
+        self.assertTrue(self.session.is_abandoned)
+        self.assertFalse(self.session.is_complete)
+
+    def test_no_longer_returned_as_the_active_session_afterward(self):
+        self.client.post(reverse("quiz-session-abandon", args=[self.session.pk]))
+        response = self.client.get(reverse("quiz-session-active"))
+        self.assertIsNone(response.data["session"])
+
+    def test_cannot_abandon_another_students_session(self):
+        self.client.force_authenticate(self.other_user)
+        response = self.client.post(reverse("quiz-session-abandon", args=[self.session.pk]))
+        self.assertEqual(response.status_code, status.HTTP_404_NOT_FOUND)
+        self.session.refresh_from_db()
+        self.assertFalse(self.session.is_abandoned)
+
+
 class BookmarkToggleAPITests(APITestCase):
     def setUp(self):
         self.user = User.objects.create_user(email="mark@example.com", password="a-strong-password-123")

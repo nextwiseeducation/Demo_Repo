@@ -108,23 +108,15 @@ export function QuizFeedbackModal({ open, onOpenChange, questionCount }: QuizFee
     }
   }
 
-  // BETA-ONLY: skipping is disabled so every user leaves feedback — see
-  // handleSkip and the Skip button below, both commented out rather than
-  // deleted so this is a one-line revert once beta testing wraps up.
-  // function handleSkip() {
-  //   reset();
-  //   onOpenChange(false);
-  // }
+  function handleSkip() {
+    toast.success("Feedback skipped");
+    reset();
+    onOpenChange(false);
+  }
 
   return (
-    // onOpenChange is intentionally a no-op: this dialog is controlled
-    // purely by the `open` prop (driven by QuizResultsPage), and the only
-    // path that's allowed to close it is a successful submit inside
-    // handleSubmit below. Without this, Base UI would still call
-    // onOpenChange (and thus close the dialog) on Escape or an
-    // outside/backdrop press, silently reopening the "skip" loophole this
-    // change is meant to close. disablePointerDismissal additionally stops
-    // an outside press from even attempting to dismiss it.
+    // onOpenChange stays a no-op: closing the dialog is only allowed via the
+    // explicit Submit or Skip actions below, not Escape or an outside press.
     <Dialog open={open} onOpenChange={() => {}} disablePointerDismissal>
       <DialogContent className="max-h-[85vh] overflow-y-auto sm:max-w-lg" showCloseButton={false}>
         <DialogHeader>
@@ -221,10 +213,9 @@ export function QuizFeedbackModal({ open, onOpenChange, questionCount }: QuizFee
         </div>
 
         <DialogFooter>
-          {/* BETA-ONLY: Skip button removed so feedback isn't optional — restore alongside handleSkip above to bring it back. */}
-          {/* <Button variant="outline" onClick={handleSkip} disabled={submitting}>
+          <Button variant="outline" onClick={handleSkip} disabled={submitting}>
             Skip
-          </Button> */}
+          </Button>
           <Button onClick={handleSubmit} disabled={submitting}>
             {submitting ? "Submitting…" : "Submit feedback"}
           </Button>

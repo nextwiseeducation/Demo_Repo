@@ -14,6 +14,7 @@ import {
   DropdownMenuTrigger,
 } from "@/components/ui/dropdown-menu";
 import { useAuth } from "@/features/auth/AuthContext";
+import { ResumeQuizPrompt } from "@/features/quiz/components/ResumeQuizPrompt";
 import { ROUTES } from "@/lib/constants";
 import { visibleAdminNavItems } from "@/types/role";
 
@@ -35,6 +36,7 @@ export function AppShell() {
 
   return (
     <div className="nw-app flex min-h-screen flex-col">
+      <ResumeQuizPrompt />
       <header>
         <div className="container header-inner">
           <div className="header-left">

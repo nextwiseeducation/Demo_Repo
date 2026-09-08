@@ -77,6 +77,72 @@ class QuizSessionCreateView(APIView):
         return Response(QuizSessionSerializer(session).data, status=status.HTTP_201_CREATED)
 
 
+class QuizSessionRetrieveView(APIView):
+    """
+    GET /api/quizzes/sessions/<uuid:session_id>/ — re-fetches an existing
+    session (id, current_question_index, ordered questions, ...) exactly as
+    QuizSessionCreateView's response shapes it.
+
+    Exists for session resume: a full page refresh on the quiz-session page
+    loses the React Router location.state QuizSessionPage was originally
+    handed, so the frontend falls back to re-requesting the session it
+    already knows the id of (kept in sessionStorage) rather than bouncing
+    the student back to quiz setup.
+    """
+
+    permission_classes = [IsAuthenticated]
+
+    def get(self, request, session_id):
+        session = get_object_or_404(QuizSession, pk=session_id, student=request.user)
+        return Response(QuizSessionSerializer(session).data)
+
+
+class QuizSessionActiveView(APIView):
+    """
+    GET /api/quizzes/sessions/active/ — the student's most recent
+    in-progress session (not finished, not declined), if any.
+
+    Used right after login (see the frontend's AppShell) to decide whether
+    to offer "continue the quiz you left?" — this is deliberately separate
+    from the sessionStorage-based silent-resume path a same-tab refresh
+    uses (QuizSessionRetrieveView above): sessionStorage does not survive
+    the browser actually closing, so this is what recovers an in-progress
+    session across a real login rather than just a refresh.
+    """
+
+    permission_classes = [IsAuthenticated]
+
+    def get(self, request):
+        # QuizSession.Meta.ordering is already -started_at, so .first() is
+        # the most recently started one.
+        session = QuizSession.objects.filter(
+            student=request.user, is_complete=False, is_abandoned=False
+        ).first()
+        if session is None:
+            return Response({"session": None})
+        return Response({"session": QuizSessionSerializer(session).data})
+
+
+class QuizSessionAbandonView(APIView):
+    """
+    POST /api/quizzes/sessions/<uuid:session_id>/abandon/ — the student
+    declined the "continue your last quiz?" prompt. Marks the session so it
+    is never offered again and its remaining questions become OMITTED
+    (see annotate_student_status), without touching is_complete (this quiz
+    was NOT finished, and must not be counted as if it were — see
+    apps.admin_api.services.analytics' use of is_complete).
+    """
+
+    permission_classes = [IsAuthenticated]
+
+    def post(self, request, session_id):
+        session = get_object_or_404(QuizSession, pk=session_id, student=request.user)
+        if not session.is_complete:
+            session.is_abandoned = True
+            session.save(update_fields=["is_abandoned"])
+        return Response(status=status.HTTP_204_NO_CONTENT)
+
+
 class QuizAnswerSubmitView(APIView):
     """
     POST /api/quizzes/sessions/<uuid:session_id>/answers/ — grades one

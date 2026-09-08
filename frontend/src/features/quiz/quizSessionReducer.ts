@@ -28,8 +28,16 @@ type Action =
   | { type: "MARK_TOGGLED"; questionId: string; marked: boolean }
   | { type: "NEXT" };
 
-export function createInitialState(questions: Question[]): QuizSessionState {
-  return { questions, currentIndex: 0, answers: {}, markedIds: new Set() };
+/**
+ * `startIndex` resumes at the server's current_question_index (see
+ * QuizSession model) rather than always starting at 0 — how a page
+ * refresh/re-login lands the student back on the same question they were
+ * on, not the first one. Clamped defensively in case the stored index is
+ * ever stale relative to `questions` (e.g. 0 for a genuinely new session).
+ */
+export function createInitialState(questions: Question[], startIndex = 0): QuizSessionState {
+  const currentIndex = Math.min(Math.max(startIndex, 0), Math.max(questions.length - 1, 0));
+  return { questions, currentIndex, answers: {}, markedIds: new Set() };
 }
 
 export function quizSessionReducer(state: QuizSessionState, action: Action): QuizSessionState {

@@ -36,6 +36,30 @@ export function createQuizSession(filters: QuizFilters) {
 }
 
 /**
+ * GET /api/quizzes/sessions/<id>/ — re-fetches an existing session, same
+ * shape as createQuizSession's response. Used to silently resume a quiz
+ * after a page refresh (see lib/activeQuizSession.ts).
+ */
+export function getQuizSession(sessionId: string) {
+  return apiClient.get<QuizSession>(`/quizzes/sessions/${sessionId}/`).then((r) => r.data);
+}
+
+/**
+ * GET /api/quizzes/sessions/active/ — the student's in-progress session, if
+ * any (not finished, not previously declined). Checked once after login to
+ * offer the "continue your last quiz?" prompt — see
+ * features/quiz/components/ResumeQuizPrompt.tsx.
+ */
+export function getActiveQuizSession() {
+  return apiClient.get<{ session: QuizSession | null }>("/quizzes/sessions/active/").then((r) => r.data);
+}
+
+/** POST /api/quizzes/sessions/<id>/abandon/ — the student declined to continue a previous session. */
+export function abandonQuizSession(sessionId: string) {
+  return apiClient.post(`/quizzes/sessions/${sessionId}/abandon/`).then(() => undefined);
+}
+
+/**
  * One question's answer, in whichever of the 6 possible shapes matches its
  * effective type (see effectiveQuestionType). Exactly one field besides
  * timeTakenSeconds is expected to be non-empty — submitSessionAnswer sends

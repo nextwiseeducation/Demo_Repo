@@ -38,6 +38,14 @@ class QuizSession(UUIDPKMixin, models.Model):
     # `position` ordering, not raw M2M iteration order.
     current_question_index = models.IntegerField(default=0)
     is_complete = models.BooleanField(default=False)
+    # Set when a student is offered "continue your last quiz?" on a fresh
+    # login (see QuizSessionActiveView) and explicitly declines — distinct
+    # from is_complete (which apps.admin_api.services.analytics relies on to
+    # mean "the student actually finished all questions", not "gave up").
+    # An abandoned session is excluded from future resume prompts, and its
+    # still-unanswered questions become OMITTED-eligible the same way a
+    # completed session's are (see annotate_student_status in services.py).
+    is_abandoned = models.BooleanField(default=False)
     started_at = models.DateTimeField(auto_now_add=True)
     # Only set once the session is actually finished — stays null for the
     # entire duration the student is still taking the quiz.

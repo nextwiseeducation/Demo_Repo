@@ -16,8 +16,8 @@ class QuizSessionAdmin(admin.ModelAdmin):
     # "id" (the raw UUID) is shown directly here rather than relying on
     # __str__, since QuizSession.__str__ isn't especially more informative
     # for admin browsing than the id + the other listed columns already are.
-    list_display = ("id", "student", "is_complete", "started_at", "completed_at")
-    list_filter = ("is_complete",)
+    list_display = ("id", "student", "is_complete", "is_abandoned", "started_at", "completed_at")
+    list_filter = ("is_complete", "is_abandoned")
     # __ (double underscore) traverses the ForeignKey to student's email
     # field — lets an admin search sessions by the student's email without
     # a dedicated search field on QuizSession itself.
