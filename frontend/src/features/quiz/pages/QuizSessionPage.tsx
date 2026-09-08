@@ -447,10 +447,15 @@ function QuizSessionInner({ quizSession }: { quizSession: QuizSessionData }) {
           type="button"
           variant="ghost"
           size="sm"
+          // A ghost button reads as barely-there — once a question is
+          // actually marked, it needs to stand out at a glance (matching
+          // the same amber the navigator's flag/skipped states already
+          // use), not just swap its icon color.
+          className={isMarked ? "mark-btn-active" : undefined}
           disabled={bookmarkMutation.isPending}
           onClick={() => bookmarkMutation.mutate()}
         >
-          {isMarked ? <BookmarkCheck className="h-4 w-4 text-primary" /> : <Bookmark className="h-4 w-4" />}
+          {isMarked ? <BookmarkCheck className="h-4 w-4" /> : <Bookmark className="h-4 w-4" />}
           {isMarked ? "Marked" : "Mark for review"}
         </Button>
       </div>

@@ -27,14 +27,24 @@ export function QuestionNavigator({ questions, currentIndex, answers, visitedIds
       <div className="q-nav-grid">
         {questions.map((q, index) => {
           const answer = answers[q.id];
+          const isCurrent = index === currentIndex;
           const isAnswered = answer?.submitted ?? false;
           const isVisited = visitedIds.has(q.id);
           const isMarked = markedIds.has(q.id);
+          // "Skipped" means visited, unanswered, and NOT the one currently
+          // on screen — the question being actively viewed hasn't been
+          // skipped yet, it just hasn't been answered yet. Without
+          // excluding isCurrent here, the current question (always in
+          // visitedIds — see quizSessionReducer's createInitialState/GOTO)
+          // would carry both "current" and "skipped" classes at once, and
+          // since they share CSS specificity, source order made the
+          // skipped (amber) style win over current (blue) every time.
+          const isSkipped = !isAnswered && isVisited && !isCurrent;
           const statusLabel = isAnswered
             ? answer?.isCorrect
               ? "answered correctly"
               : "answered incorrectly"
-            : isVisited
+            : isSkipped
               ? "skipped"
               : "not yet viewed";
 
@@ -44,12 +54,12 @@ export function QuestionNavigator({ questions, currentIndex, answers, visitedIds
               type="button"
               className={cn(
                 "q-nav-item",
-                index === currentIndex && "current",
+                isCurrent && "current",
                 isAnswered && (answer?.isCorrect ? "correct" : "incorrect"),
-                !isAnswered && isVisited && "skipped",
+                isSkipped && "skipped",
               )}
               onClick={() => onJump(index)}
-              aria-current={index === currentIndex ? "true" : undefined}
+              aria-current={isCurrent ? "true" : undefined}
               aria-label={`Question ${index + 1}, ${statusLabel}${isMarked ? ", marked for review" : ""}`}
             >
               {index + 1}

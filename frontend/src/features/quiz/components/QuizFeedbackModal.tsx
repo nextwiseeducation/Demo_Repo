@@ -121,12 +121,13 @@ export function QuizFeedbackModal({ open, onOpenChange, questionCount }: QuizFee
       <DialogContent className="max-h-[85vh] overflow-y-auto sm:max-w-lg" showCloseButton={false}>
         {/* Top-right, same spot the built-in close button would occupy —
             skipping the survey shouldn't require scrolling past the whole
-            form to reach the footer. */}
+            form to reach the footer. Same variant as "Submit feedback"
+            (not ghost/muted) so it doesn't blend into the background and
+            get missed. */}
         <Button
           type="button"
-          variant="ghost"
           size="sm"
-          className="absolute top-3 right-3 text-muted-foreground"
+          className="absolute top-3 right-3"
           onClick={handleSkip}
           disabled={submitting}
         >

@@ -10,7 +10,7 @@ export function QuizProgressBar({
   question: Question;
 }) {
   return (
-    <div>
+    <div className="flex-1 min-w-0">
       <div className="progress-row">
         <span>
           Question {currentIndex + 1} of {total}

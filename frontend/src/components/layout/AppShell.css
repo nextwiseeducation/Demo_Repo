@@ -84,7 +84,7 @@
 
 
   /* practice-quiz specific */
-  .nw-app .progress-row{ display: flex; align-items: center; justify-content: space-between; font-size: 13.5px; font-weight: 600; color: var(--muted-fg); }
+  .nw-app .progress-row{ display: flex; align-items: center; justify-content: space-between; gap: 12px; font-size: 13.5px; font-weight: 600; color: var(--muted-fg); }
 .nw-app .progress-track{ height: 5px; width: 100%; border-radius: 999px; background: #e6e3f4; overflow: hidden; margin-top: 8px; }
 .nw-app .progress-fill{ height: 100%; width: 20%; border-radius: 999px; background: var(--primary); }
 .nw-app .q-card{ border-radius: 18px; background: #fff; border: 1px solid var(--border); box-shadow: 0 1px 2px rgba(30,27,75,.04), 0 18px 44px -20px rgba(49,46,129,.28); }
@@ -230,6 +230,12 @@
 .nw-app .q-nav-dot.correct{ background: var(--success); }
 .nw-app .q-nav-dot.incorrect{ background: var(--destructive); }
 .nw-app .q-nav-dot.skipped{ background: var(--accent); }
+
+  /* "Mark for review" header button, once active — same amber the
+     navigator already uses for flags/skipped, so the whole "marked"
+     concept reads as one consistent color across the page. */
+  .nw-app .mark-btn-active{ background: rgba(217,119,6,.14); color: var(--accent); }
+.nw-app .mark-btn-active:hover{ background: rgba(217,119,6,.22); color: var(--accent); }
 
   /* Enhanced Hot Spot */
   .nw-app .hotspot{ display: flex; flex-direction: column; gap: 12px; }
