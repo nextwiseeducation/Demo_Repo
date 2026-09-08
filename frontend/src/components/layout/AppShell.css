@@ -42,7 +42,7 @@
   .nw-app .page-wide{ max-width: 860px; }
 .nw-app .card{ border-radius: var(--r-xl); background: var(--card); border: 1px solid var(--border); box-shadow: var(--shadow-card); }
 .nw-app .btn-primary{
-    display: inline-flex; align-items: center; justify-content: center; height: 36px; padding: 0 22px;
+    display: inline-flex; align-items: center; justify-content: center; gap: 6px; height: 36px; padding: 0 22px;
     border-radius: 12px; background: linear-gradient(135deg,#5b46e0,#7c3aed); color: #fff; font-size: 14px; font-weight: 600; border: none; cursor: pointer;
     font-family: inherit; box-shadow: 0 12px 30px -12px rgba(92,70,224,.85); transition: box-shadow .12s ease, transform .12s ease;
   }
@@ -204,6 +204,32 @@
 .nw-app .dragdrop-category-label{ font-size: 12px; font-weight: 700; letter-spacing: .04em; text-transform: uppercase; color: var(--muted-fg); }
 .nw-app .dragdrop-category-items{ display: flex; flex-wrap: wrap; gap: 6px; }
 .nw-app .dragdrop-rationales{ display: flex; flex-direction: column; gap: 8px; }
+
+  /* Question navigator — the "jump to any question" palette above the
+     question card, plus the Previous/Next action row below it. */
+  .nw-app .nav-actions{ margin-top: -6px; }
+.nw-app .q-nav{ display: flex; flex-direction: column; gap: 10px; }
+.nw-app .q-nav-grid{ display: flex; flex-wrap: wrap; gap: 6px; }
+.nw-app .q-nav-item{
+    position: relative; display: inline-flex; align-items: center; justify-content: center;
+    width: 32px; height: 32px; border-radius: 8px; border: 1px solid var(--border); background: #fdfdff;
+    font-size: 12.5px; font-weight: 600; color: var(--muted-fg); cursor: pointer; font-family: inherit;
+  }
+.nw-app .q-nav-item.current{ border-color: var(--primary); background: rgba(67,56,202,.12); color: var(--primary); box-shadow: 0 0 0 2px rgba(67,56,202,.18); }
+.nw-app .q-nav-item.skipped{ border-style: dashed; border-color: var(--accent); background: rgba(217,119,6,.08); color: var(--accent); }
+.nw-app .q-nav-item.correct{ border-color: var(--success); background: rgba(22,163,74,.1); color: var(--success); }
+.nw-app .q-nav-item.incorrect{ border-color: var(--destructive); background: rgba(220,38,38,.1); color: var(--destructive); }
+.nw-app .q-nav-item.current.correct,
+.nw-app .q-nav-item.current.incorrect{ box-shadow: 0 0 0 2px rgba(67,56,202,.28); }
+.nw-app .q-nav-flag{ position: absolute; top: -5px; right: -5px; width: 13px; height: 13px; padding: 2px; border-radius: 999px; background: var(--accent); color: #fff; }
+.nw-app .q-nav-legend{ display: flex; flex-wrap: wrap; align-items: center; gap: 14px; font-size: 12px; color: var(--muted-fg); }
+.nw-app .q-nav-legend-item{ display: inline-flex; align-items: center; gap: 5px; }
+.nw-app .q-nav-legend-item .q-nav-flag{ position: static; padding: 3px; }
+.nw-app .q-nav-dot{ width: 9px; height: 9px; border-radius: 999px; display: inline-block; background: #cdcbe0; }
+.nw-app .q-nav-dot.current{ background: var(--primary); }
+.nw-app .q-nav-dot.correct{ background: var(--success); }
+.nw-app .q-nav-dot.incorrect{ background: var(--destructive); }
+.nw-app .q-nav-dot.skipped{ background: var(--accent); }
 
   /* Enhanced Hot Spot */
   .nw-app .hotspot{ display: flex; flex-direction: column; gap: 12px; }

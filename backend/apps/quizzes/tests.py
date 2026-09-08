@@ -227,7 +227,7 @@ class QuizAnswerSubmitAPITests(APITestCase):
     def _url(self, session=None):
         return reverse("quiz-session-answer", args=[(session or self.session).pk])
 
-    def test_grading_persists_a_response_log_and_completes_the_session(self):
+    def test_grading_persists_a_response_log(self):
         payload = {
             "question_id": str(self.question.id),
             "selected_choice_ids": [str(self.correct.id)],
@@ -241,13 +241,19 @@ class QuizAnswerSubmitAPITests(APITestCase):
         self.assertEqual(log.selected_choice, self.correct)
         self.assertEqual(log.time_taken_seconds, 12)
 
+    def test_answering_does_not_move_position_or_complete_the_session(self):
+        # Position and completion are now owned entirely by
+        # QuizSessionPositionView/QuizSessionFinishView (free Previous/Next
+        # navigation means answering a question is a separate event from
+        # moving past it or finishing the quiz) — grading must not have the
+        # side effects it used to.
+        payload = {"question_id": str(self.question.id), "selected_choice_ids": [str(self.correct.id)]}
+        self.client.post(self._url(), payload, format="json")
+
         self.session.refresh_from_db()
-        # This session's only question was just answered — it should now be
-        # complete, exercising the current_question_index >= total_questions
-        # branch in QuizAnswerSubmitView.
-        self.assertEqual(self.session.current_question_index, 1)
-        self.assertTrue(self.session.is_complete)
-        self.assertIsNotNone(self.session.completed_at)
+        self.assertEqual(self.session.current_question_index, 0)
+        self.assertFalse(self.session.is_complete)
+        self.assertIsNone(self.session.completed_at)
 
     def test_cannot_submit_into_another_students_session(self):
         other_session = QuizSession.objects.create(student=self.other_user)
@@ -283,6 +289,160 @@ class QuizSessionRetrieveAPITests(APITestCase):
         response = self.client.get(reverse("quiz-session-retrieve", args=[self.session.pk]))
         # 404, not 403 — same reasoning as QuizAnswerSubmitView.
         self.assertEqual(response.status_code, status.HTTP_404_NOT_FOUND)
+
+
+class QuizSessionResponseHydrationAPITests(APITestCase):
+    """
+    The `responses` / `visited_question_ids` / `marked_question_ids` fields
+    on QuizSessionSerializer — what lets the frontend restore navigation
+    (Previous/Next), already-answered questions, skipped questions, and
+    flags after a resume, not just "which question index".
+    """
+
+    def setUp(self):
+        self.user = User.objects.create_user(email="hydrate@example.com", password="a-strong-password-123")
+        self.client.force_authenticate(self.user)
+        self.question = make_question()
+        self.correct = AnswerChoice.objects.create(question=self.question, choice_text="Correct", is_correct=True)
+        AnswerChoice.objects.create(question=self.question, choice_text="Wrong", is_correct=False)
+        self.other_question = make_question()
+        self.session = QuizSession.objects.create(student=self.user)
+        QuizSessionQuestion.objects.create(quiz_session=self.session, question=self.question, position=0)
+        QuizSessionQuestion.objects.create(quiz_session=self.session, question=self.other_question, position=1)
+
+    def _get(self):
+        return self.client.get(reverse("quiz-session-retrieve", args=[self.session.pk]))
+
+    def test_answered_question_appears_in_responses_with_its_answer_key(self):
+        StudentResponseLog.objects.create(
+            student=self.user,
+            question=self.question,
+            quiz_session=self.session,
+            selected_choice=self.correct,
+            is_correct=True,
+            time_taken_seconds=5,
+        )
+
+        data = self._get().data
+
+        self.assertEqual(len(data["responses"]), 1)
+        entry = data["responses"][0]
+        self.assertEqual(entry["question_id"], str(self.question.id))
+        self.assertTrue(entry["is_correct"])
+        self.assertEqual(entry["selected_choice_ids"], [str(self.correct.id)])
+        self.assertIsNone(entry["structured_answer"])
+        # The revealed answer key rides along in the same response — no
+        # second round trip needed to show rationale on a resumed question.
+        self.assertEqual(len(entry["choices"]), 2)
+
+    def test_only_the_latest_response_per_question_is_returned(self):
+        StudentResponseLog.objects.create(
+            student=self.user, question=self.question, quiz_session=self.session,
+            selected_choice=self.correct, is_correct=True, time_taken_seconds=5,
+        )
+        wrong = self.question.answer_choices.get(is_correct=False)
+        StudentResponseLog.objects.create(
+            student=self.user, question=self.question, quiz_session=self.session,
+            selected_choice=wrong, is_correct=False, time_taken_seconds=3,
+        )
+
+        data = self._get().data
+
+        self.assertEqual(len(data["responses"]), 1)
+        self.assertFalse(data["responses"][0]["is_correct"])
+
+    def test_visited_question_ids_reflects_the_visited_flag(self):
+        QuizSessionQuestion.objects.filter(quiz_session=self.session, question=self.question).update(visited=True)
+
+        data = self._get().data
+
+        self.assertEqual(data["visited_question_ids"], [str(self.question.id)])
+
+    def test_marked_question_ids_reflects_bookmarks_scoped_to_this_session(self):
+        Bookmark.objects.create(student=self.user, question=self.question)
+        # A bookmark on a question NOT in this session must not leak in.
+        Bookmark.objects.create(student=self.user, question=make_question())
+
+        data = self._get().data
+
+        self.assertEqual(data["marked_question_ids"], [str(self.question.id)])
+
+
+class QuizSessionPositionAPITests(APITestCase):
+    """POST /api/quizzes/sessions/<id>/position/ — free Previous/Next/jump navigation."""
+
+    def setUp(self):
+        self.user = User.objects.create_user(email="position@example.com", password="a-strong-password-123")
+        self.other_user = User.objects.create_user(email="position-other@example.com", password="a-strong-password-123")
+        self.client.force_authenticate(self.user)
+        self.question_a = make_question()
+        self.question_b = make_question()
+        self.session = QuizSession.objects.create(student=self.user)
+        QuizSessionQuestion.objects.create(quiz_session=self.session, question=self.question_a, position=0)
+        QuizSessionQuestion.objects.create(quiz_session=self.session, question=self.question_b, position=1)
+
+    def _url(self):
+        return reverse("quiz-session-position", args=[self.session.pk])
+
+    def test_moving_forward_updates_position_and_marks_visited(self):
+        response = self.client.post(self._url(), {"question_id": str(self.question_b.id)}, format="json")
+        self.assertEqual(response.status_code, status.HTTP_204_NO_CONTENT)
+
+        self.session.refresh_from_db()
+        self.assertEqual(self.session.current_question_index, 1)
+        session_question = QuizSessionQuestion.objects.get(quiz_session=self.session, question=self.question_b)
+        self.assertTrue(session_question.visited)
+
+    def test_moving_backward_is_allowed_unlike_the_old_answer_submit_gate(self):
+        self.client.post(self._url(), {"question_id": str(self.question_b.id)}, format="json")
+        response = self.client.post(self._url(), {"question_id": str(self.question_a.id)}, format="json")
+        self.assertEqual(response.status_code, status.HTTP_204_NO_CONTENT)
+
+        self.session.refresh_from_db()
+        self.assertEqual(self.session.current_question_index, 0)
+
+    def test_cannot_set_position_on_another_students_session(self):
+        self.client.force_authenticate(self.other_user)
+        response = self.client.post(self._url(), {"question_id": str(self.question_a.id)}, format="json")
+        self.assertEqual(response.status_code, status.HTTP_404_NOT_FOUND)
+
+
+class QuizSessionFinishAPITests(APITestCase):
+    """POST /api/quizzes/sessions/<id>/finish/ — the explicit "Finish Quiz" action."""
+
+    def setUp(self):
+        self.user = User.objects.create_user(email="finish@example.com", password="a-strong-password-123")
+        self.other_user = User.objects.create_user(email="finish-other@example.com", password="a-strong-password-123")
+        self.client.force_authenticate(self.user)
+        self.question = make_question()
+        self.session = QuizSession.objects.create(student=self.user)
+        QuizSessionQuestion.objects.create(quiz_session=self.session, question=self.question, position=0)
+
+    def _url(self, session=None):
+        return reverse("quiz-session-finish", args=[(session or self.session).pk])
+
+    def test_marks_the_session_complete_even_with_unanswered_questions(self):
+        # The whole point of an explicit finish action: the student can end
+        # the quiz having skipped questions, not just after answering every
+        # last one.
+        response = self.client.post(self._url())
+        self.assertEqual(response.status_code, status.HTTP_204_NO_CONTENT)
+
+        self.session.refresh_from_db()
+        self.assertTrue(self.session.is_complete)
+        self.assertIsNotNone(self.session.completed_at)
+
+    def test_no_longer_returned_as_the_active_session_afterward(self):
+        self.client.post(self._url())
+        response = self.client.get(reverse("quiz-session-active"))
+        self.assertIsNone(response.data["session"])
+
+    def test_cannot_finish_another_students_session(self):
+        self.client.force_authenticate(self.other_user)
+        response = self.client.post(self._url())
+        self.assertEqual(response.status_code, status.HTTP_404_NOT_FOUND)
+        self.session.refresh_from_db()
+        self.assertFalse(self.session.is_complete)
 
 
 class QuizSessionActiveAPITests(APITestCase):

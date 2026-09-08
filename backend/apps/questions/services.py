@@ -373,3 +373,28 @@ def build_hotspot_answer_key(question: Question) -> list[dict]:
         {"id": target.id, "is_correct": target.is_correct, "rationale": target.rationale}
         for target in question.hotspot_targets.all()
     ]
+
+
+def build_answer_key_for_type(question: Question, q_type: str) -> dict:
+    """
+    The single dispatch point from an effective question type to "which
+    build_*_answer_key function, under which response-body key" — shared by
+    apps.quizzes.views.QuizAnswerSubmitView (revealing one question's key
+    right after grading it) and apps.quizzes.serializers.QuizSessionSerializer
+    (bulk-revealing every already-answered question's key when a session is
+    fetched/resumed), so the two call sites can't drift on which builder
+    goes with which type.
+    """
+    if q_type in (QuestionType.MCQ, QuestionType.SATA, QuestionType.EMR):
+        return {"choices": build_answer_key(question)}
+    if q_type == QuestionType.MATRIX:
+        return {"matrix_cells": build_matrix_answer_key(question)}
+    if q_type == QuestionType.BOWTIE:
+        return {"bowtie_options": build_bowtie_answer_key(question)}
+    if q_type == QuestionType.CLOZE:
+        return {"cloze_blanks": build_cloze_answer_key(question)}
+    if q_type == QuestionType.DRAG_DROP:
+        return {"dragdrop_items": build_dragdrop_answer_key(question)}
+    if q_type == QuestionType.HOTSPOT:
+        return {"hotspot_targets": build_hotspot_answer_key(question)}
+    return {}

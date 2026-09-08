@@ -1,5 +1,5 @@
 import { useMutation, useQuery } from "@tanstack/react-query";
-import { Bookmark, BookmarkCheck } from "lucide-react";
+import { Bookmark, BookmarkCheck, ChevronLeft, ChevronRight } from "lucide-react";
 import { useEffect, useReducer, useRef } from "react";
 import { Navigate, useLocation, useNavigate } from "react-router-dom";
 
@@ -14,6 +14,7 @@ import { MatrixQuestion } from "@/features/quiz/components/MatrixQuestion";
 import { MCQChoiceList } from "@/features/quiz/components/MCQChoiceList";
 import { QuestionCard } from "@/features/quiz/components/QuestionCard";
 import { QuestionFeedbackBar } from "@/features/quiz/components/QuestionFeedbackBar";
+import { QuestionNavigator } from "@/features/quiz/components/QuestionNavigator";
 import { QuizProgressBar } from "@/features/quiz/components/QuizProgressBar";
 import { SATAChoiceList } from "@/features/quiz/components/SATAChoiceList";
 import { UnsupportedQuestionTypeNotice } from "@/features/quiz/components/UnsupportedQuestionTypeNotice";
@@ -28,17 +29,33 @@ interface LocationState {
   session: QuizSessionData;
 }
 
+// A real browser reload does NOT clear React Router's location.state — the
+// state object lives on the session-history entry itself (window.history.
+// state), and Chrome/Firefox both keep that entry's state exactly as it was
+// across a reload. So `location.state` alone cannot tell "just navigated
+// here from Generate Quiz" apart from "reloaded a tab that navigated here
+// an hour ago" — it would otherwise resurrect whatever stale snapshot
+// (empty responses, question_index frozen at 0) existed at the moment the
+// student first arrived, no matter how far they'd since progressed.
+// performance.getEntriesByType("navigation")[0].type is the browser's own
+// answer to "was THIS load a reload" (Navigation Timing Level 2, universal
+// in evergreen browsers) — computed once per page load, which is exactly
+// the granularity that matters here.
+const IS_RELOAD =
+  typeof performance !== "undefined" && performance.getEntriesByType("navigation")[0]?.type === "reload";
+
 export function QuizSessionPage() {
   const location = useLocation();
   const state = location.state as LocationState | null;
-  const hasLocationSession = Boolean(state?.session?.questions?.length);
+  const hasLocationSession = !IS_RELOAD && Boolean(state?.session?.questions?.length);
 
-  // No location.state means this render did NOT come from "Generate Quiz"
-  // or the resume prompt handing off a session directly — most commonly a
-  // page refresh while mid-quiz, since that wipes React Router's in-memory
-  // state but not sessionStorage (see lib/activeQuizSession.ts). Falls back
-  // to re-fetching that same session from the server so the student lands
-  // back on the question they were on, instead of bouncing to quiz setup.
+  // No usable location.state means this render did NOT come from "Generate
+  // Quiz" or the resume prompt handing off a session directly — either a
+  // genuine reload (IS_RELOAD, handled above) or a direct/bookmarked visit.
+  // Falls back to re-fetching the session from the server (sessionStorage's
+  // id — see lib/activeQuizSession.ts) so the student lands back on the
+  // question they were actually on, with up-to-date answers, not a stale
+  // snapshot from whenever they first navigated in.
   const storedSessionId = hasLocationSession ? null : getActiveQuizSessionId();
 
   const resumeQuery = useQuery({
@@ -158,10 +175,7 @@ function buildSubmitFields(question: Question, answer: AnswerState) {
 
 function QuizSessionInner({ quizSession }: { quizSession: QuizSessionData }) {
   const navigate = useNavigate();
-  const [session, dispatch] = useReducer(
-    quizSessionReducer,
-    createInitialState(quizSession.questions, quizSession.current_question_index),
-  );
+  const [session, dispatch] = useReducer(quizSessionReducer, createInitialState(quizSession));
 
   // Marks this session as the one to silently resume into on a same-tab
   // refresh (see lib/activeQuizSession.ts) — set unconditionally on mount
@@ -218,6 +232,23 @@ function QuizSessionInner({ quizSession }: { quizSession: QuizSessionData }) {
     onSuccess: (result) => dispatch({ type: "MARK_TOGGLED", questionId: question.id, marked: result.marked }),
   });
 
+  // Best-effort, fire-and-forget: persists which question is currently
+  // displayed (and marks it visited) every time it changes, so Previous/
+  // Next/jump navigation survives a refresh or a resume-after-login, not
+  // just the original forward-only "answer to advance" flow. Runs on mount
+  // too (not just subsequent changes) so a brand-new session's first
+  // question is marked visited on the server right away.
+  const { mutate: syncPosition } = useMutation({
+    mutationFn: (questionId: string) => quizzesApi.updateQuizSessionPosition(quizSession.id, questionId),
+  });
+  useEffect(() => {
+    syncPosition(question.id);
+  }, [question.id, syncPosition]);
+
+  const finishMutation = useMutation({
+    mutationFn: () => quizzesApi.finishQuizSession(quizSession.id),
+  });
+
   // Running accuracy across every question submitted so far this session
   // (including the one just answered) — no reducer plumbing needed, this
   // folds straight out of session.answers.
@@ -226,31 +257,45 @@ function QuizSessionInner({ quizSession }: { quizSession: QuizSessionData }) {
   const accuracyPercent =
     answeredSoFar.length > 0 ? Math.round((correctSoFar / answeredSoFar.length) * 100) : 0;
 
+  function goPrevious() {
+    dispatch({ type: "GOTO", index: session.currentIndex - 1 });
+  }
+
+  function goNext() {
+    dispatch({ type: "GOTO", index: session.currentIndex + 1 });
+  }
+
+  function handleFinish() {
+    // By now every answered question already has its answer key merged
+    // into session.questions (see quizSessionReducer's SUBMIT_RESULT) —
+    // a.isCorrect is the backend's own verdict from that same response,
+    // not recomputed here.
+    const responses: QuestionResponse[] = session.questions.map((q) => {
+      const a = session.answers[q.id];
+      return {
+        question_id: q.id,
+        selected_choice_ids: a?.selectedChoiceIds ?? [],
+        structured_answer: a?.structuredAnswer,
+        is_correct: a?.isCorrect ?? false,
+      };
+    });
+    const totalTimeSeconds = Math.round((Date.now() - startedAtRef.current) / 1000);
+    finishMutation.mutate(undefined, {
+      onSuccess: () => {
+        // Nothing left to resume into — a refresh from here on should land
+        // on quiz setup, not try to re-open this now-finished session.
+        clearActiveQuizSessionId();
+        navigate(ROUTES.quizResults, { state: { questions: session.questions, responses, totalTimeSeconds } });
+      },
+    });
+  }
+
   function goNextOrFinish() {
     if (isLastQuestion) {
-      // By now every answered question already has its answer key merged
-      // into session.questions (see quizSessionReducer's SUBMIT_RESULT) —
-      // a.isCorrect is the backend's own verdict from that same response,
-      // not recomputed here.
-      const responses: QuestionResponse[] = session.questions.map((q) => {
-        const a = session.answers[q.id];
-        return {
-          question_id: q.id,
-          selected_choice_ids: a?.selectedChoiceIds ?? [],
-          structured_answer: a?.structuredAnswer,
-          is_correct: a?.isCorrect ?? false,
-        };
-      });
-      const totalTimeSeconds = Math.round((Date.now() - startedAtRef.current) / 1000);
-      // Nothing left to resume into — a refresh from here on should land on
-      // quiz setup, not try to re-open this now-finished session.
-      clearActiveQuizSessionId();
-      navigate(ROUTES.quizResults, {
-        state: { questions: session.questions, responses, totalTimeSeconds },
-      });
+      handleFinish();
       return;
     }
-    dispatch({ type: "NEXT" });
+    goNext();
   }
 
   function setStructuredAnswer(next: StructuredAnswer) {
@@ -392,6 +437,15 @@ function QuizSessionInner({ quizSession }: { quizSession: QuizSessionData }) {
         </Button>
       </div>
 
+      <QuestionNavigator
+        questions={session.questions}
+        currentIndex={session.currentIndex}
+        answers={session.answers}
+        visitedIds={session.visitedIds}
+        markedIds={session.markedIds}
+        onJump={(index) => dispatch({ type: "GOTO", index })}
+      />
+
       {isSupported ? (
         <QuestionCard
           question={question}
@@ -418,31 +472,43 @@ function QuizSessionInner({ quizSession }: { quizSession: QuizSessionData }) {
         />
       )}
 
-      {isSupported && (
+      {isSupported && !submitted && (
         <div className="actions">
-          {!submitted ? (
-            <>
-              <span className="hint">A rationale for every option appears after you submit.</span>
-              <button
-                type="button"
-                className="btn-primary"
-                disabled={!hasAnswer(question, answer) || submitMutation.isPending}
-                onClick={() => {
-                  if (!answer) return;
-                  questionTimeSpentRef.current = Math.round((Date.now() - questionStartedAtRef.current) / 1000);
-                  submitMutation.mutate({ questionId: question.id, answer });
-                }}
-              >
-                {submitMutation.isPending ? "Submitting..." : "Submit answer"}
-              </button>
-            </>
-          ) : (
-            <button type="button" className="btn-primary" style={{ marginLeft: "auto" }} onClick={goNextOrFinish}>
-              {isLastQuestion ? "See results" : "Next question"}
-            </button>
-          )}
+          <span className="hint">A rationale for every option appears after you submit.</span>
+          <button
+            type="button"
+            className="btn-primary"
+            disabled={!hasAnswer(question, answer) || submitMutation.isPending}
+            onClick={() => {
+              if (!answer) return;
+              questionTimeSpentRef.current = Math.round((Date.now() - questionStartedAtRef.current) / 1000);
+              submitMutation.mutate({ questionId: question.id, answer });
+            }}
+          >
+            {submitMutation.isPending ? "Submitting..." : "Submit answer"}
+          </button>
         </div>
       )}
+
+      {/* Previous/Next stay outside the isSupported gate on purpose — an
+          unsupported/content-missing question still needs a way to move
+          past it, and Previous needs to work from anywhere in the quiz. */}
+      <div className="actions nav-actions">
+        <Button type="button" variant="outline" onClick={goPrevious} disabled={session.currentIndex === 0}>
+          <ChevronLeft className="h-4 w-4" />
+          Previous
+        </Button>
+        <button
+          type="button"
+          className="btn-primary"
+          style={{ marginLeft: "auto" }}
+          disabled={finishMutation.isPending}
+          onClick={isLastQuestion ? handleFinish : goNext}
+        >
+          {isLastQuestion ? (finishMutation.isPending ? "Finishing..." : "Finish Quiz") : "Next"}
+          {!isLastQuestion && <ChevronRight className="h-4 w-4" />}
+        </button>
+      </div>
     </div>
   );
 }

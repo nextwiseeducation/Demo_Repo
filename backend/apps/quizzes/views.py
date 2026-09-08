@@ -10,12 +10,7 @@ from rest_framework.views import APIView
 from apps.questions.models import Question, QuestionType
 from apps.questions.services import (
     QuestionNotGradeable,
-    build_answer_key,
-    build_bowtie_answer_key,
-    build_cloze_answer_key,
-    build_dragdrop_answer_key,
-    build_hotspot_answer_key,
-    build_matrix_answer_key,
+    build_answer_key_for_type,
     effective_question_type,
     grade_bowtie,
     grade_cloze,
@@ -30,6 +25,7 @@ from .serializers import (
     BookmarkToggleSerializer,
     QuizAnswerSubmitSerializer,
     QuizSessionCreateSerializer,
+    QuizSessionPositionSerializer,
     QuizSessionSerializer,
 )
 from .services import compute_facet_counts, resolve_question_queryset
@@ -195,22 +191,16 @@ class QuizAnswerSubmitView(APIView):
                 if not data["selected_choice_ids"]:
                     return Response({"detail": "selected_choice_ids is required for this question type."}, status=status.HTTP_400_BAD_REQUEST)
                 graded = grade_submission(question, data["selected_choice_ids"])
-                is_correct, response_body = graded.is_correct, {"choices": build_answer_key(question)}
             elif q_type == QuestionType.MATRIX:
                 graded = grade_matrix(question, data["matrix_selections"])
-                is_correct, response_body = graded.is_correct, {"matrix_cells": build_matrix_answer_key(question)}
             elif q_type == QuestionType.BOWTIE:
                 graded = grade_bowtie(question, data["bowtie_option_ids"])
-                is_correct, response_body = graded.is_correct, {"bowtie_options": build_bowtie_answer_key(question)}
             elif q_type == QuestionType.CLOZE:
                 graded = grade_cloze(question, data["cloze_selections"])
-                is_correct, response_body = graded.is_correct, {"cloze_blanks": build_cloze_answer_key(question)}
             elif q_type == QuestionType.DRAG_DROP:
                 graded = grade_dragdrop(question, data["dragdrop_placements"])
-                is_correct, response_body = graded.is_correct, {"dragdrop_items": build_dragdrop_answer_key(question)}
             elif q_type == QuestionType.HOTSPOT:
                 graded = grade_hotspot(question, data["hotspot_target_ids"])
-                is_correct, response_body = graded.is_correct, {"hotspot_targets": build_hotspot_answer_key(question)}
             else:
                 return Response(
                     {"detail": f"Question type {q_type} is not gradeable yet."}, status=status.HTTP_409_CONFLICT
@@ -219,6 +209,9 @@ class QuizAnswerSubmitView(APIView):
             return Response(
                 {"detail": "This question is not available for grading."}, status=status.HTTP_409_CONFLICT
             )
+
+        is_correct = graded.is_correct
+        response_body = build_answer_key_for_type(question, q_type)
 
         log = StudentResponseLog.objects.create(
             student=request.user,
@@ -239,16 +232,70 @@ class QuizAnswerSubmitView(APIView):
             log.selected_payload = graded.detail
             log.save(update_fields=["selected_payload"])
 
-        # max(), not a flat overwrite: re-answering an earlier question
-        # (student navigates back) must not move progress backwards.
-        session.current_question_index = max(session.current_question_index, session_question.position + 1)
-        total_questions = session.session_questions.count()
-        if session.current_question_index >= total_questions:
+        # Deliberately does NOT touch session.current_question_index or
+        # is_complete — position is now owned entirely by
+        # QuizSessionPositionView (called on every Previous/Next/jump, not
+        # just a submission) and completion by QuizSessionFinishView (an
+        # explicit "Finish Quiz" action). Free navigation means answering a
+        # question is no longer the same event as moving past it or
+        # finishing the quiz.
+        return Response({"is_correct": is_correct, **response_body})
+
+
+class QuizSessionPositionView(APIView):
+    """
+    POST /api/quizzes/sessions/<uuid:session_id>/position/ — records which
+    question the student is currently viewing. Called by the frontend on
+    every Previous/Next/jump navigation, not just after a graded submission
+    (see QuizAnswerSubmitView above, which no longer touches position at
+    all) — that's what makes free backward/forward navigation possible
+    while still resuming at the exact right question later.
+
+    Also marks that question's QuizSessionQuestion.visited=True, which is
+    what lets the frontend's question navigator distinguish "skipped"
+    (visited, still no StudentResponseLog) from "not reached yet".
+    """
+
+    permission_classes = [IsAuthenticated]
+
+    def post(self, request, session_id):
+        session = get_object_or_404(QuizSession, pk=session_id, student=request.user)
+        serializer = QuizSessionPositionSerializer(data=request.data)
+        serializer.is_valid(raise_exception=True)
+        session_question = get_object_or_404(
+            QuizSessionQuestion, quiz_session=session, question_id=serializer.validated_data["question_id"]
+        )
+
+        if session.current_question_index != session_question.position:
+            session.current_question_index = session_question.position
+            session.save(update_fields=["current_question_index"])
+
+        if not session_question.visited:
+            session_question.visited = True
+            session_question.save(update_fields=["visited"])
+
+        return Response(status=status.HTTP_204_NO_CONTENT)
+
+
+class QuizSessionFinishView(APIView):
+    """
+    POST /api/quizzes/sessions/<uuid:session_id>/finish/ — the student
+    explicitly ended the quiz (the "Finish Quiz" action on the last
+    question). Completion is a deliberate action rather than an implicit
+    side effect of answering: free Previous/Next/jump navigation means
+    reaching the last question's index no longer implies every question in
+    the session has been seen, let alone answered.
+    """
+
+    permission_classes = [IsAuthenticated]
+
+    def post(self, request, session_id):
+        session = get_object_or_404(QuizSession, pk=session_id, student=request.user)
+        if not session.is_complete:
             session.is_complete = True
             session.completed_at = timezone.now()
-        session.save(update_fields=["current_question_index", "is_complete", "completed_at"])
-
-        return Response({"is_correct": is_correct, **response_body})
+            session.save(update_fields=["is_complete", "completed_at"])
+        return Response(status=status.HTTP_204_NO_CONTENT)
 
 
 class QuizFacetCountsView(APIView):

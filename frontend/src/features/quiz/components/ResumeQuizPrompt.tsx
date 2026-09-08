@@ -81,9 +81,12 @@ export function ResumeQuizPrompt() {
         <DialogHeader>
           <DialogTitle>Continue your last quiz?</DialogTitle>
           <DialogDescription>
-            You have a practice quiz in progress ({session.current_question_index}/{session.questions.length}{" "}
-            questions answered). Would you like to continue where you left off? If you select No, this quiz's
-            progress will not be saved.
+            {/* responses.length, not current_question_index — the index is
+                just the last question viewed (Previous/Next/jump can move
+                it anywhere), not how many have actually been answered. */}
+            You have a practice quiz in progress ({session.responses.length}/{session.questions.length} questions
+            answered). Would you like to continue where you left off? If you select No, this quiz's progress will
+            not be saved.
           </DialogDescription>
         </DialogHeader>
         <DialogFooter>

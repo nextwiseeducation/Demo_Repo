@@ -1,5 +1,5 @@
 import type { Question } from "@/types/question";
-import type { StructuredAnswer } from "@/types/quiz";
+import type { QuizSession, SessionResponseSummary, StructuredAnswer } from "@/types/quiz";
 import type { SubmitAnswerResult } from "@/lib/api/questions";
 
 export interface AnswerState {
@@ -8,7 +8,7 @@ export interface AnswerState {
   /** MATRIX / BOWTIE / CLOZE / DRAG_DROP / HOTSPOT only. */
   structuredAnswer?: StructuredAnswer;
   submitted: boolean;
-  /** Set once SUBMIT_RESULT lands — the backend's verdict, not recomputed client-side (the answer key isn't available client-side until then anyway). */
+  /** Set once SUBMIT_RESULT lands (or hydrated from a prior session — see createInitialState) — the backend's verdict, not recomputed client-side. */
   isCorrect?: boolean;
 }
 
@@ -18,6 +18,60 @@ export interface QuizSessionState {
   answers: Record<string, AnswerState>;
   /** Question ids the student has "marked for review" (UWorld's Marked flag) — independent of answers. */
   markedIds: Set<string>;
+  /**
+   * Question ids the student has actually been shown in this session,
+   * answered or not — what separates "skipped" (visited, still no answer)
+   * from "not reached yet" in the question navigator. Persisted server-side
+   * via QuizSessionPositionView so it survives a refresh/resume, not just
+   * kept client-side.
+   */
+  visitedIds: Set<string>;
+}
+
+type AnswerKeyPayload = SubmitAnswerResult | Omit<SessionResponseSummary, "question_id" | "is_correct" | "selected_choice_ids" | "structured_answer">;
+
+/**
+ * Merges whichever answer key fields are present on `result` into the one
+ * matching question, in place — the "starts undefined, filled in once
+ * revealed" pattern QuestionCard/MCQChoiceList/SATAChoiceList already read
+ * from answer_choices etc. directly. Shared by SUBMIT_RESULT (a just-graded
+ * answer) and createInitialState (bulk-hydrating every already-answered
+ * question from QuizSession.responses on load/resume) so the two can't
+ * drift on how a revealed key gets merged in.
+ */
+function mergeAnswerKeyIntoQuestion(question: Question, result: AnswerKeyPayload): Question {
+  if (result.choices) {
+    const byId = new Map(result.choices.map((c) => [c.id, c]));
+    return { ...question, answer_choices: question.answer_choices.map((c) => ({ ...c, ...byId.get(c.id) })) };
+  }
+  if (result.matrix_cells) {
+    return { ...question, matrix_cells: result.matrix_cells };
+  }
+  if (result.bowtie_options) {
+    const byId = new Map(result.bowtie_options.map((o) => [o.id, o]));
+    return { ...question, bowtie_options: question.bowtie_options.map((o) => ({ ...o, ...byId.get(o.id) })) };
+  }
+  if (result.cloze_blanks) {
+    const byBlankId = new Map(result.cloze_blanks.map((b) => [b.blank_id, b]));
+    return {
+      ...question,
+      cloze_blanks: question.cloze_blanks.map((blank) => {
+        const revealed = byBlankId.get(blank.id);
+        if (!revealed) return blank;
+        const byOptionId = new Map(revealed.options.map((o) => [o.id, o]));
+        return { ...blank, options: blank.options.map((o) => ({ ...o, ...byOptionId.get(o.id) })) };
+      }),
+    };
+  }
+  if (result.dragdrop_items) {
+    const byId = new Map(result.dragdrop_items.map((i) => [i.id, i]));
+    return { ...question, dragdrop_items: question.dragdrop_items.map((i) => ({ ...i, ...byId.get(i.id) })) };
+  }
+  if (result.hotspot_targets) {
+    const byId = new Map(result.hotspot_targets.map((t) => [t.id, t]));
+    return { ...question, hotspot_targets: question.hotspot_targets.map((t) => ({ ...t, ...byId.get(t.id) })) };
+  }
+  return question;
 }
 
 type Action =
@@ -26,18 +80,46 @@ type Action =
   | { type: "SET_STRUCTURED_ANSWER"; questionId: string; answer: StructuredAnswer }
   | { type: "SUBMIT_RESULT"; questionId: string; result: SubmitAnswerResult }
   | { type: "MARK_TOGGLED"; questionId: string; marked: boolean }
-  | { type: "NEXT" };
+  | { type: "GOTO"; index: number };
 
 /**
- * `startIndex` resumes at the server's current_question_index (see
- * QuizSession model) rather than always starting at 0 — how a page
- * refresh/re-login lands the student back on the same question they were
- * on, not the first one. Clamped defensively in case the stored index is
- * ever stale relative to `questions` (e.g. 0 for a genuinely new session).
+ * Builds the reducer's starting state directly from a QuizSession as the
+ * backend hands it over — whether that's a freshly-created session (no
+ * prior answers/visits/marks), a same-tab refresh, or a resume after
+ * login. Hydrating everything here in one shot (rather than dispatching
+ * follow-up actions after mount) means a question the student already
+ * answered renders in its final, locked-in, rationale-revealed state
+ * immediately, with no flash of the unanswered form first.
  */
-export function createInitialState(questions: Question[], startIndex = 0): QuizSessionState {
-  const currentIndex = Math.min(Math.max(startIndex, 0), Math.max(questions.length - 1, 0));
-  return { questions, currentIndex, answers: {}, markedIds: new Set() };
+export function createInitialState(session: QuizSession): QuizSessionState {
+  const answers: Record<string, AnswerState> = {};
+  let questions = session.questions;
+
+  for (const response of session.responses) {
+    questions = questions.map((q) => (q.id === response.question_id ? mergeAnswerKeyIntoQuestion(q, response) : q));
+    answers[response.question_id] = {
+      selectedChoiceIds: response.selected_choice_ids,
+      structuredAnswer: response.structured_answer ?? undefined,
+      submitted: true,
+      isCorrect: response.is_correct,
+    };
+  }
+
+  const currentIndex = Math.min(Math.max(session.current_question_index, 0), Math.max(questions.length - 1, 0));
+  const visitedIds = new Set(session.visited_question_ids);
+  // The question about to be displayed counts as visited even if the
+  // server hasn't recorded it yet (e.g. the very first question of a
+  // brand-new session, before QuizSessionPage's position effect has fired).
+  const currentQuestionId = questions[currentIndex]?.id;
+  if (currentQuestionId) visitedIds.add(currentQuestionId);
+
+  return {
+    questions,
+    currentIndex,
+    answers,
+    markedIds: new Set(session.marked_question_ids),
+    visitedIds,
+  };
 }
 
 export function quizSessionReducer(state: QuizSessionState, action: Action): QuizSessionState {
@@ -87,46 +169,7 @@ export function quizSessionReducer(state: QuizSessionState, action: Action): Qui
           ...state.answers,
           [action.questionId]: { ...existing, submitted: true, isCorrect: result.is_correct },
         },
-        questions: state.questions.map((q) => {
-          if (q.id !== action.questionId) return q;
-
-          // Merges whichever answer key came back into this question's own
-          // matching collection, in place — the same "starts undefined,
-          // filled in once revealed" pattern QuestionCard/MCQChoiceList/
-          // SATAChoiceList already read from answer_choices directly.
-          if (result.choices) {
-            const byId = new Map(result.choices.map((c) => [c.id, c]));
-            return { ...q, answer_choices: q.answer_choices.map((c) => ({ ...c, ...byId.get(c.id) })) };
-          }
-          if (result.matrix_cells) {
-            return { ...q, matrix_cells: result.matrix_cells };
-          }
-          if (result.bowtie_options) {
-            const byId = new Map(result.bowtie_options.map((o) => [o.id, o]));
-            return { ...q, bowtie_options: q.bowtie_options.map((o) => ({ ...o, ...byId.get(o.id) })) };
-          }
-          if (result.cloze_blanks) {
-            const byBlankId = new Map(result.cloze_blanks.map((b) => [b.blank_id, b]));
-            return {
-              ...q,
-              cloze_blanks: q.cloze_blanks.map((blank) => {
-                const revealed = byBlankId.get(blank.id);
-                if (!revealed) return blank;
-                const byOptionId = new Map(revealed.options.map((o) => [o.id, o]));
-                return { ...blank, options: blank.options.map((o) => ({ ...o, ...byOptionId.get(o.id) })) };
-              }),
-            };
-          }
-          if (result.dragdrop_items) {
-            const byId = new Map(result.dragdrop_items.map((i) => [i.id, i]));
-            return { ...q, dragdrop_items: q.dragdrop_items.map((i) => ({ ...i, ...byId.get(i.id) })) };
-          }
-          if (result.hotspot_targets) {
-            const byId = new Map(result.hotspot_targets.map((t) => [t.id, t]));
-            return { ...q, hotspot_targets: q.hotspot_targets.map((t) => ({ ...t, ...byId.get(t.id) })) };
-          }
-          return q;
-        }),
+        questions: state.questions.map((q) => (q.id === action.questionId ? mergeAnswerKeyIntoQuestion(q, result) : q)),
       };
     }
     case "MARK_TOGGLED": {
@@ -135,8 +178,13 @@ export function quizSessionReducer(state: QuizSessionState, action: Action): Qui
       else markedIds.delete(action.questionId);
       return { ...state, markedIds };
     }
-    case "NEXT":
-      return { ...state, currentIndex: Math.min(state.currentIndex + 1, state.questions.length - 1) };
+    case "GOTO": {
+      const currentIndex = Math.min(Math.max(action.index, 0), state.questions.length - 1);
+      const questionId = state.questions[currentIndex]?.id;
+      const visitedIds = new Set(state.visitedIds);
+      if (questionId) visitedIds.add(questionId);
+      return { ...state, currentIndex, visitedIds };
+    }
     default:
       return state;
   }

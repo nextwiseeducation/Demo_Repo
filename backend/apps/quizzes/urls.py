@@ -7,6 +7,8 @@ from .views import (
     QuizSessionAbandonView,
     QuizSessionActiveView,
     QuizSessionCreateView,
+    QuizSessionFinishView,
+    QuizSessionPositionView,
     QuizSessionRetrieveView,
 )
 
@@ -15,6 +17,8 @@ urlpatterns = [
     path("sessions/active/", QuizSessionActiveView.as_view(), name="quiz-session-active"),
     path("sessions/<uuid:session_id>/", QuizSessionRetrieveView.as_view(), name="quiz-session-retrieve"),
     path("sessions/<uuid:session_id>/answers/", QuizAnswerSubmitView.as_view(), name="quiz-session-answer"),
+    path("sessions/<uuid:session_id>/position/", QuizSessionPositionView.as_view(), name="quiz-session-position"),
+    path("sessions/<uuid:session_id>/finish/", QuizSessionFinishView.as_view(), name="quiz-session-finish"),
     path("sessions/<uuid:session_id>/abandon/", QuizSessionAbandonView.as_view(), name="quiz-session-abandon"),
     path("facet-counts/", QuizFacetCountsView.as_view(), name="quiz-facet-counts"),
     path("bookmarks/toggle/", BookmarkToggleView.as_view(), name="quiz-bookmark-toggle"),

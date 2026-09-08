@@ -82,6 +82,13 @@ class QuizSessionQuestion(models.Model):
     quiz_session = models.ForeignKey(QuizSession, on_delete=models.CASCADE, related_name="session_questions")
     question = models.ForeignKey(Question, on_delete=models.CASCADE, related_name="session_questions")
     position = models.IntegerField()
+    # Has the student's client ever displayed this question in this
+    # session — set by QuizSessionPositionView the moment it's shown, on
+    # every Previous/Next/jump navigation, not just a graded submission.
+    # This is what distinguishes "skipped" (visited, still no
+    # StudentResponseLog) from "not reached yet" for the question
+    # navigator, and is independent of whether it was ever answered.
+    visited = models.BooleanField(default=False)
 
     class Meta:
         ordering = ["position"]

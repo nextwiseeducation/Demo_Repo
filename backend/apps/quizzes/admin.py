@@ -9,6 +9,7 @@ class QuizSessionQuestionInline(admin.TabularInline):
     # QuizSessionQuestion separately.
     model = QuizSessionQuestion
     extra = 0
+    fields = ("position", "question", "visited")
 
 
 @admin.register(QuizSession)

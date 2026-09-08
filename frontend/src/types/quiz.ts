@@ -41,6 +41,36 @@ export interface QuizSession {
   started_at: string;
   filter_config: QuizFilters;
   questions: Question[];
+  /** One entry per already-answered question — see SessionResponseSummary. */
+  responses: SessionResponseSummary[];
+  /** Questions the student has been shown in this session (answered or not) — what "skipped" is derived from on the frontend. */
+  visited_question_ids: string[];
+  /** Questions flagged "Mark for review", scoped to this session's question set (Bookmark itself is cross-session — see the Bookmark model's own docstring). */
+  marked_question_ids: string[];
+}
+
+/**
+ * One already-answered question, exactly as QuizAnswerSubmitView's response
+ * shapes a live grading result (is_correct + the type's revealed answer
+ * key), plus what the student actually selected — enough to fully restore
+ * an answered question's locked-in, rationale-revealed state on resume or
+ * when navigating back to it with Previous, without a second round trip.
+ */
+export interface SessionResponseSummary {
+  question_id: string;
+  is_correct: boolean;
+  /** MCQ / SATA / EMR only — empty for the 5 NGN structural types. */
+  selected_choice_ids: string[];
+  /** Set only for the 5 NGN structural types — see StructuredAnswer. */
+  structured_answer?: StructuredAnswer | null;
+  // Exactly one of these is present, matching the question's effective
+  // type — same shape/reasoning as SubmitAnswerResult in lib/api/questions.ts.
+  choices?: { id: string; is_correct: boolean; rationale: string }[];
+  matrix_cells?: { row_id: number; column_id: number; is_correct: boolean; rationale: string }[];
+  bowtie_options?: { id: number; is_correct: boolean; rationale: string }[];
+  cloze_blanks?: { blank_id: number; options: { id: number; is_correct: boolean; rationale: string }[] }[];
+  dragdrop_items?: { id: number; correct_category_id: number | null; correct_order: number | null; rationale: string }[];
+  hotspot_targets?: { id: number; is_correct: boolean; rationale: string }[];
 }
 
 /**

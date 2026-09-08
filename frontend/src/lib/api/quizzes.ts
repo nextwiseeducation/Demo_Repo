@@ -102,3 +102,21 @@ export function submitSessionAnswer(sessionId: string, payload: SubmitAnswerPayl
 export function toggleBookmark(questionId: string) {
   return apiClient.post<{ marked: boolean }>("/quizzes/bookmarks/toggle/", { question_id: questionId }).then((r) => r.data);
 }
+
+/**
+ * POST /api/quizzes/sessions/<id>/position/ — records which question the
+ * student is currently viewing. Called on every Previous/Next/jump
+ * navigation (not just after submitting an answer), which is both what
+ * makes free navigation resumable and what marks a question "visited" for
+ * the question navigator's skipped/not-reached distinction.
+ */
+export function updateQuizSessionPosition(sessionId: string, questionId: string) {
+  return apiClient
+    .post(`/quizzes/sessions/${sessionId}/position/`, { question_id: questionId })
+    .then(() => undefined);
+}
+
+/** POST /api/quizzes/sessions/<id>/finish/ — the explicit "Finish Quiz" action. */
+export function finishQuizSession(sessionId: string) {
+  return apiClient.post(`/quizzes/sessions/${sessionId}/finish/`).then(() => undefined);
+}
