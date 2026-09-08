@@ -42,7 +42,8 @@ interface LocationState {
 // in evergreen browsers) — computed once per page load, which is exactly
 // the granularity that matters here.
 const IS_RELOAD =
-  typeof performance !== "undefined" && performance.getEntriesByType("navigation")[0]?.type === "reload";
+  typeof performance !== "undefined" &&
+  (performance.getEntriesByType("navigation")[0] as PerformanceNavigationTiming | undefined)?.type === "reload";
 
 export function QuizSessionPage() {
   const location = useLocation();
