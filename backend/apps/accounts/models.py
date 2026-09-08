@@ -75,6 +75,17 @@ class UserManager(BaseUserManager):
             raise ValueError("Superuser must have is_staff=True")
         if extra_fields.get("is_superuser") is not True:
             raise ValueError("Superuser must have is_superuser=True")
+        if extra_fields.get("role") != UserRole.SUPERUSER:
+            # Same reasoning as the two checks above: setdefault above only
+            # fills role in when the caller didn't pass one. Without this
+            # check, a caller that explicitly passes role=STUDENT/
+            # CONTENT_ADMIN (a copy-pasted call, a seed script bug) would
+            # silently get an account with full is_superuser/Django-admin
+            # power but a role value IsSuperuser (permissions.py) rejects
+            # for the React admin dashboard — the two "is this an admin"
+            # signals this project deliberately keeps separate would then
+            # disagree on the very account meant to have every privilege.
+            raise ValueError("Superuser must have role=UserRole.SUPERUSER")
 
         # Delegates to create_user for the actual construction/hashing/save,
         # so there's exactly one code path that creates a User row.

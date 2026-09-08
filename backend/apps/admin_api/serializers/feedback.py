@@ -5,7 +5,19 @@ from apps.feedback.models import FeedbackStatus, QuestionIssueReport, QuizFeedba
 SURVEY_TEXT_PREVIEW_CHARS = 100
 
 
-class AdminQuizFeedbackListSerializer(serializers.ModelSerializer):
+class StudentIdentityMixin(serializers.Serializer):
+    """
+    student_name/student_email, shared by every admin feedback serializer
+    that surfaces which student submitted a row — kept in one place so a
+    future change to how a student's display name is derived (e.g. away
+    from User.full_name) is a single edit, not four.
+    """
+
+    student_name = serializers.CharField(source="student.full_name", read_only=True)
+    student_email = serializers.CharField(source="student.email", read_only=True)
+
+
+class AdminQuizFeedbackListSerializer(StudentIdentityMixin, serializers.ModelSerializer):
     """
     The Feedback dashboard's Survey tab row shape. `feedback_text` is
     whichever of improvement_suggestion/liked_most the student actually
@@ -14,8 +26,6 @@ class AdminQuizFeedbackListSerializer(serializers.ModelSerializer):
     single row can't just be one model field.
     """
 
-    student_name = serializers.CharField(source="student.full_name", read_only=True)
-    student_email = serializers.CharField(source="student.email", read_only=True)
     feedback_text = serializers.SerializerMethodField()
 
     class Meta:
@@ -27,11 +37,8 @@ class AdminQuizFeedbackListSerializer(serializers.ModelSerializer):
         return text[:SURVEY_TEXT_PREVIEW_CHARS]
 
 
-class AdminQuizFeedbackDetailSerializer(serializers.ModelSerializer):
+class AdminQuizFeedbackDetailSerializer(StudentIdentityMixin, serializers.ModelSerializer):
     """The full survey response, for the detail panel — every rating plus both free-text fields, not just the preview."""
-
-    student_name = serializers.CharField(source="student.full_name", read_only=True)
-    student_email = serializers.CharField(source="student.email", read_only=True)
 
     class Meta:
         model = QuizFeedback
@@ -74,11 +81,9 @@ class AdminQuizFeedbackStatusUpdateSerializer(serializers.ModelSerializer):
         return super().save(status_updated_at=timezone.now(), **kwargs)
 
 
-class AdminQuestionIssueReportListSerializer(serializers.ModelSerializer):
+class AdminQuestionIssueReportListSerializer(StudentIdentityMixin, serializers.ModelSerializer):
     """The Feedback dashboard's Issue Reports tab row shape."""
 
-    student_name = serializers.CharField(source="student.full_name", read_only=True)
-    student_email = serializers.CharField(source="student.email", read_only=True)
     description_preview = serializers.SerializerMethodField()
 
     class Meta:
@@ -97,10 +102,7 @@ class AdminQuestionIssueReportListSerializer(serializers.ModelSerializer):
         return obj.description[:SURVEY_TEXT_PREVIEW_CHARS]
 
 
-class AdminQuestionIssueReportDetailSerializer(serializers.ModelSerializer):
-    student_name = serializers.CharField(source="student.full_name", read_only=True)
-    student_email = serializers.CharField(source="student.email", read_only=True)
-
+class AdminQuestionIssueReportDetailSerializer(StudentIdentityMixin, serializers.ModelSerializer):
     class Meta:
         model = QuestionIssueReport
         fields = [

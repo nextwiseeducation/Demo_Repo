@@ -1,8 +1,27 @@
+from datetime import timedelta
+
 from django.conf import settings
 from django.db import models
+from django.utils import timezone
 
 from apps.core.models import UUIDPKMixin
 from apps.questions.models import AnswerChoice, Question
+
+
+class QuizSessionQuerySet(models.QuerySet):
+    def in_progress(self):
+        """
+        Not finished and not abandoned — the single definition of "still
+        open" every view/service needs, instead of each one re-deriving
+        `is_complete=False, is_abandoned=False` (or some subset of it) on
+        its own, which previously let guards drift and let some endpoints
+        (e.g. the position-update view) skip the check entirely.
+        """
+        return self.filter(is_complete=False, is_abandoned=False)
+
+    def closed(self):
+        """The complement of in_progress() — finished or abandoned, i.e. not coming back to be answered further."""
+        return self.exclude(is_complete=False, is_abandoned=False)
 
 
 class QuizSession(UUIDPKMixin, models.Model):
@@ -13,6 +32,8 @@ class QuizSession(UUIDPKMixin, models.Model):
     below already cover the timestamps this model actually needs (a
     generic updated_at wouldn't add anything meaningful).
     """
+
+    objects = QuizSessionQuerySet.as_manager()
 
     # settings.AUTH_USER_MODEL (not importing User directly from
     # apps.accounts.models) is the Django-recommended way to reference the
@@ -37,6 +58,12 @@ class QuizSession(UUIDPKMixin, models.Model):
     # StudentResponseLog each time. Indexes into the through model's
     # `position` ordering, not raw M2M iteration order.
     current_question_index = models.IntegerField(default=0)
+    # Snapshotted at creation time (len(pool) in QuizSessionCreateView) so
+    # the auto-complete check in QuizAnswerSubmitView can compare against it
+    # directly instead of re-running session_questions.count() on every
+    # single answer submission — the question set for a session never
+    # changes after creation, so this never goes stale.
+    total_questions = models.IntegerField(default=0)
     is_complete = models.BooleanField(default=False)
     # Set when a student is offered "continue your last quiz?" on a fresh
     # login (see QuizSessionActiveView) and explicitly declines — distinct
@@ -65,6 +92,46 @@ class QuizSession(UUIDPKMixin, models.Model):
         # Most recently started sessions first — matches how a "resume your
         # last quiz" or history view would want to list them.
         ordering = ["-started_at"]
+
+    @property
+    def is_open(self) -> bool:
+        """Still in progress — not finished, not abandoned. See QuizSessionQuerySet.in_progress for the query-level equivalent."""
+        return not self.is_complete and not self.is_abandoned
+
+    @property
+    def is_time_expired(self) -> bool:
+        """
+        True once a timed session's started_at + time_limit_minutes has
+        passed. is_timed/time_limit_minutes are captured into filter_config
+        at creation time (QuizSessionCreateSerializer) rather than as their
+        own columns, same as every other quiz-setup filter choice — this is
+        the one place that reads them back, so the limit is actually
+        enforced server-side instead of trusted to the frontend's own
+        countdown timer.
+        """
+        if not self.filter_config.get("is_timed"):
+            return False
+        time_limit_minutes = self.filter_config.get("time_limit_minutes")
+        if not time_limit_minutes:
+            return False
+        return timezone.now() >= self.started_at + timedelta(minutes=time_limit_minutes)
+
+    def close_if_time_expired(self) -> bool:
+        """
+        Auto-completes this session if its time limit has passed (same
+        "completion is a fact the server records, not just something the
+        client happens to stop calling" reasoning as QuizAnswerSubmitView's
+        last-question auto-complete). Returns whether the session is (now)
+        closed for this reason, so callers can reject the request that
+        triggered the check.
+        """
+        if not self.is_time_expired:
+            return False
+        if not self.is_complete:
+            self.is_complete = True
+            self.completed_at = timezone.now()
+            self.save(update_fields=["is_complete", "completed_at"])
+        return True
 
     def __str__(self):
         return f"QuizSession({self.student}, {self.started_at:%Y-%m-%d})"

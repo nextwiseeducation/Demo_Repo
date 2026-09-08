@@ -9,11 +9,8 @@ silently ignored rather than raising, so a typo in a param name can never
 accidentally widen the queryset instead of narrowing it.
 """
 
+from apps.core.query_params import filter_id_in, parse_int_csv
 from apps.questions.models import ClinicalJudgmentSkill, Difficulty, QuestionType
-
-
-def _int_list(raw: str) -> list[int]:
-    return [int(v) for v in raw.split(",") if v.strip().isdigit()]
 
 
 def apply_admin_question_filters(queryset, params):
@@ -23,7 +20,7 @@ def apply_admin_question_filters(queryset, params):
         queryset = queryset.filter(question_type__in=[v for v in question_type.split(",") if v in valid])
 
     if nursing_system := params.get("nursing_system"):
-        queryset = queryset.filter(nursing_system_id__in=_int_list(nursing_system))
+        queryset = filter_id_in(queryset, "nursing_system", parse_int_csv(nursing_system.split(",")))
 
     if difficulty := params.get("difficulty"):
         valid = {v for v, _ in Difficulty.choices}

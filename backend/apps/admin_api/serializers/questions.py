@@ -440,6 +440,21 @@ class QuestionAdminSerializer(serializers.ModelSerializer):
             "hotspot_targets",
         ]
         read_only_fields = ["id", "created_at", "updated_at"]
+        # Question.Meta adds a conditional UniqueConstraint on
+        # (case_study, case_study_sequence) — DRF auto-derives a
+        # UniqueTogetherValidator from it, but that validator's
+        # enforce_required_fields() unconditionally demands BOTH fields be
+        # present on every create regardless of the constraint's own
+        # condition=Q(case_study__isnull=False), which would make
+        # case_study/case_study_sequence "required" for every question
+        # type, not just NGN_CASE. The real requirement (case_study +
+        # case_study_sequence required when, and only when,
+        # question_type == NGN_CASE) is already enforced explicitly in
+        # validate() below; the database constraint itself remains the
+        # actual integrity guarantee either way. Empty list disables just
+        # the auto-generated validator — there is no other unique-together
+        # constraint on Question for this to lose.
+        validators = []
 
     def validate(self, attrs):
         instance = self.instance

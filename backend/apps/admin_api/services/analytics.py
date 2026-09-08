@@ -63,12 +63,24 @@ WEAKEST_SYSTEMS_LIMIT = 5
 TOP_SYSTEMS_LIMIT = 10
 
 
-def _total_students() -> int:
-    return _student_queryset().count()
-
-
 def _student_queryset():
     return get_user_model().objects.filter(role=UserRole.STUDENT)
+
+
+def _student_counts(this_month_start, prev_month_start) -> dict:
+    """
+    total_students and mom_student_growth both need a count over the same
+    student queryset — merged into the one multi-Count(filter=...)-in-one-
+    aggregate call already used by _completion_rate below, instead of each
+    metric running its own separate query against the User table.
+    """
+    return _student_queryset().aggregate(
+        total=Count("id"),
+        this_month=Count("id", filter=Q(date_joined__gte=this_month_start)),
+        prev_month=Count(
+            "id", filter=Q(date_joined__gte=prev_month_start, date_joined__lt=this_month_start)
+        ),
+    )
 
 
 def _total_revenue() -> Decimal:
@@ -100,31 +112,14 @@ def _total_revenue() -> Decimal:
     return result["total"]
 
 
-def _mom_student_growth() -> float | None:
+def _mom_student_growth(counts: dict) -> float | None:
     """
-    Month-over-month growth in student registrations. Returns None (not 0,
-    not a fabricated 100%) when there is no prior month to compare against
-    — any number computed from zero would misrepresent an absence of data
-    as a real trend.
+    Month-over-month growth in student registrations, from the shared
+    _student_counts() aggregate. Returns None (not 0, not a fabricated
+    100%) when there is no prior month to compare against — any number
+    computed from zero would misrepresent an absence of data as a real
+    trend.
     """
-    now = timezone.now()
-    this_month_start = now.replace(day=1, hour=0, minute=0, second=0, microsecond=0)
-    # Subtracting one day from the 1st of this month always lands in the
-    # previous month regardless of month length or a year boundary, and
-    # .replace(day=1) then snaps it to that month's start — safer than
-    # hand-rolling "month - 1" arithmetic, which breaks in January.
-    prev_month_start = (this_month_start - timedelta(days=1)).replace(day=1)
-
-    counts = (
-        _student_queryset()
-        .filter(date_joined__gte=prev_month_start)
-        .aggregate(
-            this_month=Count("id", filter=Q(date_joined__gte=this_month_start)),
-            prev_month=Count(
-                "id", filter=Q(date_joined__gte=prev_month_start, date_joined__lt=this_month_start)
-            ),
-        )
-    )
     if counts["prev_month"] == 0:
         return None
     growth = (counts["this_month"] - counts["prev_month"]) / counts["prev_month"] * 100
@@ -261,10 +256,19 @@ def build_admin_analytics() -> dict:
     than one query per view method) so every metric here is documented and
     tested in one place.
     """
+    now = timezone.now()
+    this_month_start = now.replace(day=1, hour=0, minute=0, second=0, microsecond=0)
+    # Subtracting one day from the 1st of this month always lands in the
+    # previous month regardless of month length or a year boundary, and
+    # .replace(day=1) then snaps it to that month's start — safer than
+    # hand-rolling "month - 1" arithmetic, which breaks in January.
+    prev_month_start = (this_month_start - timedelta(days=1)).replace(day=1)
+    student_counts = _student_counts(this_month_start, prev_month_start)
+
     return {
-        "total_students": _total_students(),
+        "total_students": student_counts["total"],
         "total_revenue": _total_revenue(),
-        "mom_student_growth": _mom_student_growth(),
+        "mom_student_growth": _mom_student_growth(student_counts),
         "total_questions_answered": _total_questions_answered(),
         "top_systems_by_attempts": _top_systems_by_attempts(),
         "avg_quiz_score": _avg_quiz_score(),

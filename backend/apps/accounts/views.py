@@ -1,5 +1,10 @@
 from django.contrib.auth import get_user_model
 
+# make_password (PBKDF2 by default) is deliberately run on the
+# duplicate-email path in RegisterView even though its result is discarded —
+# see that path's own comment.
+from django.contrib.auth.hashers import make_password
+
 # validate_password is called directly here (not as a serializer field
 # validator) because password strength has to be judged against the user it
 # belongs to — see the long note on the import in serializers.py.
@@ -113,6 +118,14 @@ class RegisterView(APIView):
         # fail on the database's unique constraint.
         existing = User.objects.filter(email__iexact=email).first()
         if existing is not None:
+            # Pay the same PBKDF2 hashing cost the new-account path pays via
+            # serializer.save() -> create_user() -> set_password() below,
+            # purely for its CPU time — the result is thrown away. Without
+            # this, the duplicate-email branch returns measurably faster
+            # than the new-account branch, and that timing gap is itself an
+            # account-enumeration oracle even though the two responses are
+            # byte-identical.
+            make_password(serializer.validated_data["password"])
             send_duplicate_registration_email(existing)
             return Response(REGISTRATION_RESPONSE, status=status.HTTP_201_CREATED)
 

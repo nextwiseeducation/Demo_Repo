@@ -7,6 +7,7 @@ from rest_framework.response import Response
 from rest_framework.throttling import ScopedRateThrottle
 from rest_framework.views import APIView
 
+from apps.core.query_params import parse_int_csv
 from apps.questions.models import Question, QuestionType
 from apps.questions.services import (
     QuestionNotGradeable,
@@ -72,10 +73,10 @@ class QuizSessionCreateView(APIView):
             )
 
         with transaction.atomic():
-            QuizSession.objects.filter(student=request.user, is_complete=False, is_abandoned=False).update(
-                is_abandoned=True
+            QuizSession.objects.filter(student=request.user).in_progress().update(is_abandoned=True)
+            session = QuizSession.objects.create(
+                student=request.user, filter_config=filters, total_questions=len(pool)
             )
-            session = QuizSession.objects.create(student=request.user, filter_config=filters)
             QuizSessionQuestion.objects.bulk_create(
                 [
                     QuizSessionQuestion(quiz_session=session, question=question, position=index)
@@ -124,9 +125,7 @@ class QuizSessionActiveView(APIView):
     def get(self, request):
         # QuizSession.Meta.ordering is already -started_at, so .first() is
         # the most recently started one.
-        session = QuizSession.objects.filter(
-            student=request.user, is_complete=False, is_abandoned=False
-        ).first()
+        session = QuizSession.objects.filter(student=request.user).in_progress().first()
         if session is None:
             return Response({"session": None})
         return Response({"session": QuizSessionSerializer(session).data})
@@ -172,9 +171,13 @@ class QuizAnswerSubmitView(APIView):
         # after fetching) — one student cannot even discover whether
         # another student's session id exists via a 403-vs-404 distinction.
         session = get_object_or_404(QuizSession, pk=session_id, student=request.user)
-        if session.is_complete or session.is_abandoned:
+        if not session.is_open:
             return Response(
                 {"detail": "This quiz session is no longer accepting answers."}, status=status.HTTP_409_CONFLICT
+            )
+        if session.close_if_time_expired():
+            return Response(
+                {"detail": "This quiz session's time limit has been reached."}, status=status.HTTP_409_CONFLICT
             )
 
         serializer = QuizAnswerSubmitSerializer(data=request.data)
@@ -182,21 +185,20 @@ class QuizAnswerSubmitView(APIView):
         data = serializer.validated_data
 
         session_question = get_object_or_404(
-            QuizSessionQuestion, quiz_session=session, question_id=data["question_id"]
+            QuizSessionQuestion.objects.select_related("question").prefetch_related(
+                "question__answer_choices",
+                "question__matrix_rows",
+                "question__matrix_columns",
+                "question__bowtie_options",
+                "question__cloze_blanks__options",
+                "question__dragdrop_items",
+                "question__dragdrop_categories",
+                "question__hotspot_targets",
+            ),
+            quiz_session=session,
+            question_id=data["question_id"],
         )
-        question = (
-            Question.objects.prefetch_related(
-                "answer_choices",
-                "matrix_rows",
-                "matrix_columns",
-                "bowtie_options",
-                "cloze_blanks__options",
-                "dragdrop_items",
-                "dragdrop_categories",
-                "hotspot_targets",
-            )
-            .get(pk=data["question_id"])
-        )
+        question = session_question.question
 
         # Which family of question this actually is — for an NGN_CASE item
         # that's ngn_type, not question_type itself (see
@@ -208,6 +210,14 @@ class QuizAnswerSubmitView(APIView):
                 if not data["selected_choice_ids"]:
                     return Response({"detail": "selected_choice_ids is required for this question type."}, status=status.HTTP_400_BAD_REQUEST)
                 graded = grade_submission(question, data["selected_choice_ids"])
+                if q_type == QuestionType.MCQ and len(graded.selected_ids) > 1:
+                    # MCQ has exactly one correct answer by definition — unlike
+                    # SATA/EMR, which render as checkboxes on the frontend and
+                    # are meant to allow several. Reject rather than silently
+                    # picking an arbitrary one of the submitted ids to log.
+                    return Response(
+                        {"detail": "MCQ accepts only one selected choice."}, status=status.HTTP_400_BAD_REQUEST
+                    )
             elif q_type == QuestionType.MATRIX:
                 graded = grade_matrix(question, data["matrix_selections"])
             elif q_type == QuestionType.BOWTIE:
@@ -238,13 +248,29 @@ class QuizAnswerSubmitView(APIView):
             time_taken_seconds=data["time_taken_seconds"],
         )
         if q_type in (QuestionType.MCQ, QuestionType.SATA, QuestionType.EMR):
-            if q_type == QuestionType.SATA:
+            if q_type in (QuestionType.SATA, QuestionType.EMR):
+                # Both render as checkboxes on the frontend and allow several
+                # selections (EMRChoiceList reuses SATAChoiceList's markup) —
+                # only MCQ is constrained to exactly one, enforced above.
                 log.selected_choices.set(graded.selected_ids)
             elif graded.selected_ids:
-                # MCQ/EMR-as-single: exactly one id expected; grade_submission
-                # already discarded anything not a real choice of this question.
+                # MCQ: exactly one id expected (enforced above);
+                # grade_submission already discarded anything not a real
+                # choice of this question.
                 log.selected_choice_id = next(iter(graded.selected_ids))
                 log.save(update_fields=["selected_choice"])
+            if not graded.selected_ids and data["selected_choice_ids"]:
+                # Every submitted id was discarded by grade_submission as not
+                # belonging to this question (stale/deleted choice, tampered
+                # request) — there is no real AnswerChoice left to point
+                # selected_choice(s) at, but CLAUDE.md requires this log to
+                # capture what the student actually chose, not just
+                # correct/incorrect. Keep the raw submitted ids here rather
+                # than dropping them silently.
+                log.selected_payload = {
+                    "submitted_choice_ids": [str(choice_id) for choice_id in data["selected_choice_ids"]]
+                }
+                log.save(update_fields=["selected_payload"])
         else:
             log.selected_payload = graded.detail
             log.save(update_fields=["selected_payload"])
@@ -266,12 +292,18 @@ class QuizAnswerSubmitView(APIView):
         # quiz?" on every future login, forever, even though nothing is left
         # to answer. QuizSessionFinishView stays as the explicit action for
         # ending a quiz EARLY (some questions still skipped/unanswered).
-        total_questions = session.session_questions.count()
-        answered_questions = session.response_logs.values("question_id").distinct().count()
-        if answered_questions >= total_questions:
-            session.is_complete = True
-            session.completed_at = timezone.now()
-            session.save(update_fields=["is_complete", "completed_at"])
+        with transaction.atomic():
+            # select_for_update: two near-simultaneous submissions for the
+            # last two unanswered questions must not both read
+            # "not yet complete" and race to write it — the lock serializes
+            # them so only the request that actually observes the final
+            # count performs the completion write.
+            locked_session = QuizSession.objects.select_for_update().get(pk=session.pk)
+            answered_questions = locked_session.response_logs.values("question_id").distinct().count()
+            if answered_questions >= locked_session.total_questions:
+                locked_session.is_complete = True
+                locked_session.completed_at = timezone.now()
+                locked_session.save(update_fields=["is_complete", "completed_at"])
 
         return Response({"is_correct": is_correct, **response_body})
 
@@ -294,6 +326,15 @@ class QuizSessionPositionView(APIView):
 
     def post(self, request, session_id):
         session = get_object_or_404(QuizSession, pk=session_id, student=request.user)
+        if not session.is_open:
+            return Response(
+                {"detail": "This quiz session is no longer accepting position updates."},
+                status=status.HTTP_409_CONFLICT,
+            )
+        if session.close_if_time_expired():
+            return Response(
+                {"detail": "This quiz session's time limit has been reached."}, status=status.HTTP_409_CONFLICT
+            )
         serializer = QuizSessionPositionSerializer(data=request.data)
         serializer.is_valid(raise_exception=True)
         session_question = get_object_or_404(
@@ -325,6 +366,16 @@ class QuizSessionFinishView(APIView):
 
     def post(self, request, session_id):
         session = get_object_or_404(QuizSession, pk=session_id, student=request.user)
+        if session.is_abandoned:
+            # An abandoned session (resume prompt declined) is closed for
+            # good — finishing it now would leave is_complete=True and
+            # is_abandoned=True both set, a combination none of the
+            # "in progress" queries elsewhere (QuizSessionQuerySet.in_progress)
+            # expect to see.
+            return Response(
+                {"detail": "This quiz session was abandoned and can no longer be finished."},
+                status=status.HTTP_409_CONFLICT,
+            )
         if not session.is_complete:
             session.is_complete = True
             session.completed_at = timezone.now()
@@ -383,7 +434,7 @@ def _parse_facet_query_params(params) -> dict:
         return [v for v in values if v]
 
     def get_int_list(name: str) -> list[int]:
-        return [int(v) for v in get_list(name) if v.lstrip("-").isdigit()]
+        return parse_int_csv(get_list(name))
 
     return {
         "question_types": get_list("question_types"),

@@ -244,7 +244,7 @@ class QuizAnswerSubmitAPITests(APITestCase):
         self.question = make_question()
         self.correct = AnswerChoice.objects.create(question=self.question, choice_text="Correct", is_correct=True)
         AnswerChoice.objects.create(question=self.question, choice_text="Wrong", is_correct=False)
-        self.session = QuizSession.objects.create(student=self.user)
+        self.session = QuizSession.objects.create(student=self.user, total_questions=1)
         QuizSessionQuestion.objects.create(quiz_session=self.session, question=self.question, position=0)
 
     def _url(self, session=None):
@@ -272,6 +272,8 @@ class QuizAnswerSubmitAPITests(APITestCase):
         second_question = make_question(stem="A second question, left unanswered.")
         AnswerChoice.objects.create(question=second_question, choice_text="Correct", is_correct=True)
         QuizSessionQuestion.objects.create(quiz_session=self.session, question=second_question, position=1)
+        self.session.total_questions = 2
+        self.session.save(update_fields=["total_questions"])
 
         payload = {"question_id": str(self.question.id), "selected_choice_ids": [str(self.correct.id)]}
         self.client.post(self._url(), payload, format="json")
@@ -299,6 +301,8 @@ class QuizAnswerSubmitAPITests(APITestCase):
         second_question = make_question(stem="A second question, left unanswered.")
         AnswerChoice.objects.create(question=second_question, choice_text="Correct", is_correct=True)
         QuizSessionQuestion.objects.create(quiz_session=self.session, question=second_question, position=1)
+        self.session.total_questions = 2
+        self.session.save(update_fields=["total_questions"])
 
         payload = {"question_id": str(self.question.id), "selected_choice_ids": [str(self.correct.id)]}
         self.client.post(self._url(), payload, format="json")

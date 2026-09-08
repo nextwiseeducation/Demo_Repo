@@ -20,10 +20,11 @@ read as if correctness were a property of the question alone, and this way
 the rules can be unit-tested against plain data with no ORM instance at all.
 """
 
+from collections.abc import Iterable
 from dataclasses import dataclass
 from uuid import UUID
 
-from .models import AnswerChoice, MatrixCell, Question, QuestionType
+from .models import MatrixCell, Question, QuestionType
 
 
 class QuestionNotGradeable(Exception):
@@ -59,7 +60,7 @@ class GradedAnswer:
     correct_ids: frozenset[UUID]
 
 
-def grade_submission(question: Question, selected_choice_ids) -> GradedAnswer:
+def grade_submission(question: Question, selected_choice_ids: Iterable[str | UUID]) -> GradedAnswer:
     """
     Grades `selected_choice_ids` against `question`'s answer key.
 
@@ -136,11 +137,6 @@ def build_answer_key(question: Question) -> list[dict]:
     ]
 
 
-def choices_for(question: Question) -> list[AnswerChoice]:
-    """Convenience accessor kept next to the rules that consume it."""
-    return list(question.answer_choices.all())
-
-
 def effective_question_type(question: Question) -> str:
     """
     The type that decides how a question is rendered and graded.
@@ -182,7 +178,7 @@ def _coerce_ints(values) -> set[int]:
     return coerced
 
 
-def grade_matrix(question: Question, matrix_selections) -> GradedResult:
+def grade_matrix(question: Question, matrix_selections: list[dict]) -> GradedResult:
     """
     matrix_selections: [{"row_id": int, "column_id": int}, ...] — the
     column the student picked for each row (single-select per row, the
@@ -219,7 +215,7 @@ def grade_matrix(question: Question, matrix_selections) -> GradedResult:
     return GradedResult(is_correct=is_correct, detail={"selected_by_row": selected_by_row})
 
 
-def grade_bowtie(question: Question, bowtie_option_ids) -> GradedResult:
+def grade_bowtie(question: Question, bowtie_option_ids: Iterable[int | str]) -> GradedResult:
     """
     bowtie_option_ids: flat list of BowTieOption ids selected across all
     three sections (Assessment/Condition/Action) — each option already
@@ -241,7 +237,7 @@ def grade_bowtie(question: Question, bowtie_option_ids) -> GradedResult:
     )
 
 
-def grade_cloze(question: Question, cloze_selections) -> GradedResult:
+def grade_cloze(question: Question, cloze_selections: list[dict]) -> GradedResult:
     """cloze_selections: [{"blank_id": int, "option_id": int}, ...] — one chosen option per dropdown blank."""
     blanks = list(question.cloze_blanks.prefetch_related("options").all())
     if not blanks:
@@ -267,7 +263,7 @@ def grade_cloze(question: Question, cloze_selections) -> GradedResult:
     return GradedResult(is_correct=is_correct, detail={"selected_by_blank": selected_by_blank})
 
 
-def grade_dragdrop(question: Question, dragdrop_placements) -> GradedResult:
+def grade_dragdrop(question: Question, dragdrop_placements: list[dict]) -> GradedResult:
     """
     dragdrop_placements: [{"item_id": int, "category_id": int|None, "order": int|None}, ...].
 
@@ -295,20 +291,30 @@ def grade_dragdrop(question: Question, dragdrop_placements) -> GradedResult:
         placement_by_item[next(iter(item_id))] = placement
 
     if is_category_variant:
+        if any(item.correct_category_id is None for item in items):
+            raise QuestionNotGradeable(
+                f"Question {question.pk} has a drag-drop item with no correct category and cannot be graded."
+            )
         is_correct = all(
             _coerce_ints([placement_by_item.get(item.id, {}).get("category_id")])
             == _coerce_ints([item.correct_category_id])
             for item in items
         )
     else:
+        if any(item.correct_order is None for item in items):
+            raise QuestionNotGradeable(
+                f"Question {question.pk} has a drag-drop item with no correct order and cannot be graded."
+            )
         is_correct = all(
-            placement_by_item.get(item.id, {}).get("order") == item.correct_order for item in items
+            _coerce_ints([placement_by_item.get(item.id, {}).get("order")])
+            == _coerce_ints([item.correct_order])
+            for item in items
         )
 
     return GradedResult(is_correct=is_correct, detail={"placements": list(dragdrop_placements)})
 
 
-def grade_hotspot(question: Question, hotspot_target_ids) -> GradedResult:
+def grade_hotspot(question: Question, hotspot_target_ids: Iterable[int | str]) -> GradedResult:
     """hotspot_target_ids: flat list of selected HotSpotTarget ids — exact-set-match against every target flagged is_correct."""
     targets = list(question.hotspot_targets.all())
     valid_ids = {target.id for target in targets}
@@ -325,6 +331,16 @@ def grade_hotspot(question: Question, hotspot_target_ids) -> GradedResult:
 
 
 def build_matrix_answer_key(question: Question) -> list[dict]:
+    """
+    Walks question.matrix_rows.all() / row.cells.all() rather than issuing
+    its own MatrixCell.objects.filter(...) query — the same "read off an
+    already-prefetched relation" shape build_bowtie_answer_key/
+    build_cloze_answer_key/etc. below already use, and the one that lets a
+    caller prefetching question__matrix_rows__cells (e.g.
+    QuizSessionSerializer.get_responses, revealing every already-answered
+    question's key on session resume) actually avoid the N+1 this used to
+    cause regardless of what the caller prefetched.
+    """
     return [
         {
             "row_id": cell.row_id,
@@ -332,7 +348,8 @@ def build_matrix_answer_key(question: Question) -> list[dict]:
             "is_correct": cell.is_correct,
             "rationale": cell.rationale,
         }
-        for cell in MatrixCell.objects.filter(row__question=question).select_related("row", "column")
+        for row in question.matrix_rows.all()
+        for cell in row.cells.all()
     ]
 
 

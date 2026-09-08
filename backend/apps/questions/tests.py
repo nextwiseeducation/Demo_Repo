@@ -12,13 +12,31 @@ from apps.taxonomy.models import ClientNeedsCategory, ClientNeedsSubcategory, Nu
 from .models import (
     MAX_QUESTION_IMAGE_BYTES,
     AnswerChoice,
+    BowTieOption,
+    BowTieSection,
     ClinicalJudgmentSkill,
+    ClozeBlank,
+    ClozeOption,
     CognitiveLevel,
     Difficulty,
+    DragDropCategory,
+    DragDropItem,
+    HotSpotTarget,
+    MatrixCell,
+    MatrixColumn,
+    MatrixRow,
     Question,
     QuestionType,
 )
-from .services import QuestionNotGradeable, grade_submission
+from .services import (
+    QuestionNotGradeable,
+    grade_bowtie,
+    grade_cloze,
+    grade_dragdrop,
+    grade_hotspot,
+    grade_matrix,
+    grade_submission,
+)
 
 User = get_user_model()
 
@@ -247,6 +265,269 @@ class GradeSubmissionTests(TestCase):
 
         with self.assertRaises(QuestionNotGradeable):
             grade_submission(broken, [])
+
+
+class GradeMatrixTests(TestCase):
+    """
+    grade_matrix is wired into the live answer-submission endpoint
+    (apps.quizzes.views.QuizAnswerSubmitView) exactly like grade_submission
+    above, but had no test coverage of its own — these are the equivalent
+    correctness/QuestionNotGradeable tests for it.
+    """
+
+    def setUp(self):
+        self.question = make_question(question_type=QuestionType.MATRIX, stem="Matrix question.")
+        self.expected = MatrixColumn.objects.create(question=self.question, text="Expected", display_order=0)
+        self.unexpected = MatrixColumn.objects.create(
+            question=self.question, text="Unexpected", display_order=1
+        )
+        self.row = MatrixRow.objects.create(question=self.question, text="Increased heart rate", display_order=0)
+        MatrixCell.objects.create(row=self.row, column=self.expected, is_correct=True)
+        MatrixCell.objects.create(row=self.row, column=self.unexpected, is_correct=False)
+
+    def test_selecting_the_correct_column_is_correct(self):
+        result = grade_matrix(self.question, [{"row_id": self.row.id, "column_id": self.expected.id}])
+        self.assertTrue(result.is_correct)
+
+    def test_selecting_the_wrong_column_is_incorrect(self):
+        result = grade_matrix(self.question, [{"row_id": self.row.id, "column_id": self.unexpected.id}])
+        self.assertFalse(result.is_correct)
+
+    def test_row_with_no_correct_column_raises(self):
+        broken_row = MatrixRow.objects.create(question=self.question, text="Broken row", display_order=1)
+        MatrixCell.objects.create(row=broken_row, column=self.expected, is_correct=False)
+        MatrixCell.objects.create(row=broken_row, column=self.unexpected, is_correct=False)
+
+        with self.assertRaises(QuestionNotGradeable):
+            grade_matrix(self.question, [{"row_id": self.row.id, "column_id": self.expected.id}])
+
+    def test_no_rows_raises(self):
+        empty = make_question(
+            question_type=QuestionType.MATRIX,
+            stem="Empty matrix.",
+            nursing_system=self.question.nursing_system,
+            topic=self.question.topic,
+            nclex_client_needs_category=self.question.nclex_client_needs_category,
+            nclex_client_needs_subcategory=self.question.nclex_client_needs_subcategory,
+        )
+        with self.assertRaises(QuestionNotGradeable):
+            grade_matrix(empty, [])
+
+
+class GradeBowtieTests(TestCase):
+    def setUp(self):
+        self.question = make_question(question_type=QuestionType.BOWTIE, stem="Bow-tie question.")
+        self.correct_condition = BowTieOption.objects.create(
+            question=self.question, section=BowTieSection.CONDITION, option_text="Heart failure", is_correct=True
+        )
+        self.wrong_condition = BowTieOption.objects.create(
+            question=self.question, section=BowTieSection.CONDITION, option_text="Anxiety", is_correct=False
+        )
+
+    def test_selecting_the_correct_option_is_correct(self):
+        result = grade_bowtie(self.question, [self.correct_condition.id])
+        self.assertTrue(result.is_correct)
+
+    def test_selecting_the_wrong_option_is_incorrect(self):
+        result = grade_bowtie(self.question, [self.wrong_condition.id])
+        self.assertFalse(result.is_correct)
+
+    def test_no_correct_option_raises(self):
+        broken = make_question(
+            question_type=QuestionType.BOWTIE,
+            stem="Broken bow-tie.",
+            nursing_system=self.question.nursing_system,
+            topic=self.question.topic,
+            nclex_client_needs_category=self.question.nclex_client_needs_category,
+            nclex_client_needs_subcategory=self.question.nclex_client_needs_subcategory,
+        )
+        BowTieOption.objects.create(
+            question=broken, section=BowTieSection.CONDITION, option_text="Only option", is_correct=False
+        )
+        with self.assertRaises(QuestionNotGradeable):
+            grade_bowtie(broken, [])
+
+
+class GradeClozeTests(TestCase):
+    def setUp(self):
+        self.question = make_question(
+            question_type=QuestionType.CLOZE, stem="The nurse should [dropdown 1] the provider."
+        )
+        self.blank = ClozeBlank.objects.create(question=self.question, blank_key="dropdown 1", display_order=0)
+        self.correct_option = ClozeOption.objects.create(
+            blank=self.blank, option_text="notify", is_correct=True
+        )
+        self.wrong_option = ClozeOption.objects.create(blank=self.blank, option_text="ignore", is_correct=False)
+
+    def test_selecting_the_correct_option_is_correct(self):
+        result = grade_cloze(
+            self.question, [{"blank_id": self.blank.id, "option_id": self.correct_option.id}]
+        )
+        self.assertTrue(result.is_correct)
+
+    def test_selecting_the_wrong_option_is_incorrect(self):
+        result = grade_cloze(self.question, [{"blank_id": self.blank.id, "option_id": self.wrong_option.id}])
+        self.assertFalse(result.is_correct)
+
+    def test_blank_with_no_correct_option_raises(self):
+        broken_blank = ClozeBlank.objects.create(question=self.question, blank_key="dropdown 2", display_order=1)
+        ClozeOption.objects.create(blank=broken_blank, option_text="only option", is_correct=False)
+
+        with self.assertRaises(QuestionNotGradeable):
+            grade_cloze(self.question, [{"blank_id": self.blank.id, "option_id": self.correct_option.id}])
+
+
+class GradeDragDropTests(TestCase):
+    """
+    Covers both DragDropItem variants, including the two bugs fixed
+    alongside these tests: grade_dragdrop's category-variant branch used to
+    have no per-item null check (an item missing correct_category_id was
+    silently treated as vacuously correct when unplaced), and its
+    sequencing branch compared correct_order to submitted order with a raw
+    '==' and no type coercion (a client sending "2" instead of 2 would
+    always fail).
+    """
+
+    def setUp(self):
+        self.question = make_question(
+            question_type=QuestionType.DRAG_DROP, stem="Sort these into the correct bucket."
+        )
+        self.category_a = DragDropCategory.objects.create(
+            question=self.question, name="Expected", display_order=0
+        )
+        self.category_b = DragDropCategory.objects.create(
+            question=self.question, name="Unexpected", display_order=1
+        )
+        self.item = DragDropItem.objects.create(
+            question=self.question, text="Increased heart rate", display_order=0, correct_category=self.category_a
+        )
+
+    def test_category_variant_correct_placement_is_correct(self):
+        result = grade_dragdrop(
+            self.question, [{"item_id": self.item.id, "category_id": self.category_a.id}]
+        )
+        self.assertTrue(result.is_correct)
+
+    def test_category_variant_wrong_placement_is_incorrect(self):
+        result = grade_dragdrop(
+            self.question, [{"item_id": self.item.id, "category_id": self.category_b.id}]
+        )
+        self.assertFalse(result.is_correct)
+
+    def test_category_variant_item_missing_correct_category_raises(self):
+        # The bug: previously this item's missing correct_category_id
+        # meant _coerce_ints([None]) == _coerce_ints([None]) (two empty
+        # sets), so an unplaced item was scored correct rather than the
+        # question being flagged as unresolvable content.
+        DragDropItem.objects.create(question=self.question, text="No answer key", display_order=1)
+        with self.assertRaises(QuestionNotGradeable):
+            grade_dragdrop(self.question, [{"item_id": self.item.id, "category_id": self.category_a.id}])
+
+    def test_sequencing_variant_correct_order_is_correct(self):
+        sequence_question = make_question(
+            question_type=QuestionType.DRAG_DROP,
+            stem="Put these steps in order.",
+            nursing_system=self.question.nursing_system,
+            topic=self.question.topic,
+            nclex_client_needs_category=self.question.nclex_client_needs_category,
+            nclex_client_needs_subcategory=self.question.nclex_client_needs_subcategory,
+        )
+        first = DragDropItem.objects.create(
+            question=sequence_question, text="First", display_order=0, correct_order=1
+        )
+        second = DragDropItem.objects.create(
+            question=sequence_question, text="Second", display_order=1, correct_order=2
+        )
+
+        result = grade_dragdrop(
+            sequence_question,
+            [{"item_id": first.id, "order": 1}, {"item_id": second.id, "order": 2}],
+        )
+        self.assertTrue(result.is_correct)
+
+    def test_sequencing_variant_accepts_string_order_from_client(self):
+        # Regression test for the type-coercion bug: a client/serializer
+        # path that leaves "order" as a JSON string ("1") instead of an int
+        # must still grade correctly — a raw '==' comparison used to fail
+        # every correctly-ordered submission of this shape.
+        sequence_question = make_question(
+            question_type=QuestionType.DRAG_DROP,
+            stem="Put these steps in order (string order).",
+            nursing_system=self.question.nursing_system,
+            topic=self.question.topic,
+            nclex_client_needs_category=self.question.nclex_client_needs_category,
+            nclex_client_needs_subcategory=self.question.nclex_client_needs_subcategory,
+        )
+        first = DragDropItem.objects.create(
+            question=sequence_question, text="First", display_order=0, correct_order=1
+        )
+
+        result = grade_dragdrop(sequence_question, [{"item_id": first.id, "order": "1"}])
+        self.assertTrue(result.is_correct)
+
+    def test_sequencing_variant_item_missing_correct_order_raises(self):
+        sequence_question = make_question(
+            question_type=QuestionType.DRAG_DROP,
+            stem="Put these steps in order (broken).",
+            nursing_system=self.question.nursing_system,
+            topic=self.question.topic,
+            nclex_client_needs_category=self.question.nclex_client_needs_category,
+            nclex_client_needs_subcategory=self.question.nclex_client_needs_subcategory,
+        )
+        first = DragDropItem.objects.create(
+            question=sequence_question, text="First", display_order=0, correct_order=1
+        )
+        DragDropItem.objects.create(question=sequence_question, text="No answer key", display_order=1)
+
+        with self.assertRaises(QuestionNotGradeable):
+            grade_dragdrop(sequence_question, [{"item_id": first.id, "order": 1}])
+
+    def test_no_items_raises(self):
+        empty = make_question(
+            question_type=QuestionType.DRAG_DROP,
+            stem="Empty drag-drop.",
+            nursing_system=self.question.nursing_system,
+            topic=self.question.topic,
+            nclex_client_needs_category=self.question.nclex_client_needs_category,
+            nclex_client_needs_subcategory=self.question.nclex_client_needs_subcategory,
+        )
+        with self.assertRaises(QuestionNotGradeable):
+            grade_dragdrop(empty, [])
+
+
+class GradeHotspotTests(TestCase):
+    def setUp(self):
+        self.question = make_question(
+            question_type=QuestionType.HOTSPOT,
+            stem="The client is diaphoretic and pale, with a heart rate of 132.",
+        )
+        self.correct_target = HotSpotTarget.objects.create(
+            question=self.question, target_text="diaphoretic and pale", is_correct=True
+        )
+        self.wrong_target = HotSpotTarget.objects.create(
+            question=self.question, target_text="heart rate of 132", is_correct=False
+        )
+
+    def test_selecting_the_correct_target_is_correct(self):
+        result = grade_hotspot(self.question, [self.correct_target.id])
+        self.assertTrue(result.is_correct)
+
+    def test_selecting_the_wrong_target_is_incorrect(self):
+        result = grade_hotspot(self.question, [self.wrong_target.id])
+        self.assertFalse(result.is_correct)
+
+    def test_no_correct_target_raises(self):
+        broken = make_question(
+            question_type=QuestionType.HOTSPOT,
+            stem="Broken hot spot question text.",
+            nursing_system=self.question.nursing_system,
+            topic=self.question.topic,
+            nclex_client_needs_category=self.question.nclex_client_needs_category,
+            nclex_client_needs_subcategory=self.question.nclex_client_needs_subcategory,
+        )
+        HotSpotTarget.objects.create(question=broken, target_text="Broken hot spot", is_correct=False)
+        with self.assertRaises(QuestionNotGradeable):
+            grade_hotspot(broken, [])
 
 
 class QuestionListAPITests(APITestCase):
@@ -664,14 +945,14 @@ def _build_workbook():
         ),
         dict(
             Question_ID="CLZ-1",
-            Option_ID="Option 1",
+            Option_ID="Blank1_A",
             Option_Text="call the provider",
             Is_Correct="TRUE",
             Rationale="Right.",
         ),
         dict(
             Question_ID="CLZ-1",
-            Option_ID="Option 2",
+            Option_ID="Blank1_B",
             Option_Text="do nothing",
             Is_Correct="FALSE",
             Rationale="Wrong.",

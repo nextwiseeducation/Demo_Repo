@@ -18,6 +18,7 @@ from django.core.exceptions import ValidationError
 from django.core.files.uploadedfile import UploadedFile
 from django.db import transaction
 
+from apps.questions.authoring import CLOZE_TOKEN_PATTERN
 from apps.questions.models import (
     AnswerChoice,
     BowTieOption,
@@ -394,7 +395,7 @@ class NgnItemBankImporter:
 
         options = sheets["answer_options"].get(external_id, [])
         if question_type in (QuestionType.MCQ, QuestionType.SATA, QuestionType.EMR):
-            self._sync_answer_choices(question, options)
+            self._sync_answer_choices(question, options, question_type)
         elif question_type == QuestionType.MATRIX:
             self._sync_matrix(question, options)
         elif question_type == QuestionType.BOWTIE:
@@ -538,7 +539,7 @@ class NgnItemBankImporter:
         options = sheets["answer_options"].get(external_id, [])
         if options:
             if ngn_type in (QuestionType.MCQ, QuestionType.SATA, QuestionType.EMR):
-                self._sync_answer_choices(question, options)
+                self._sync_answer_choices(question, options, ngn_type)
             elif ngn_type == QuestionType.MATRIX:
                 self._sync_matrix(question, options)
             elif ngn_type == QuestionType.BOWTIE:
@@ -650,14 +651,20 @@ class NgnItemBankImporter:
     # --- Per-type child-row builders ---------------------------------------
 
     @staticmethod
-    def _sync_answer_choices(question, options):
+    def _sync_answer_choices(question, options, effective_type):
         if not options:
             raise RowError("no Answer_Options rows for this question")
         correct_count = sum(1 for opt in options if _is_true(opt.get("Is_Correct")))
         if correct_count == 0:
             raise RowError("no answer choice is marked Is_Correct")
-        if question.question_type == QuestionType.MCQ and correct_count > 1:
+        if effective_type == QuestionType.MCQ and correct_count != 1:
             raise RowError(f"question_type is MCQ but {correct_count} choices are marked correct")
+        if effective_type in (QuestionType.SATA, QuestionType.EMR) and len(options) < 2:
+            # Same rule apps.questions.authoring._validate_answer_choices
+            # enforces for the manual admin editor — a "select all that
+            # apply"/EMR question with only one option to pick from isn't
+            # gradeable as intended.
+            raise RowError(f"{effective_type} questions require at least 2 answer choices, found {len(options)}")
 
         question.answer_choices.all().delete()
         for i, opt in enumerate(options):
@@ -713,8 +720,8 @@ class NgnItemBankImporter:
     def _sync_bowtie(question, options):
         if not options:
             raise RowError("no Answer_Options rows for this Bow-Tie question")
-        question.bowtie_options.all().delete()
         section_counters: dict[str, int] = {}
+        parsed = []
         for opt in options:
             option_id = opt.get("Option_ID") or ""
             prefix = option_id.split(" ")[0] if option_id else ""
@@ -725,6 +732,25 @@ class NgnItemBankImporter:
                 )
             order = section_counters.get(section, 0)
             section_counters[section] = order + 1
+            parsed.append((opt, section, order))
+
+        # Same completeness rule apps.questions.authoring._validate_bowtie
+        # enforces for the manual admin editor: an xlsx missing an entire
+        # section (e.g. no "Condition " rows at all), or a section where no
+        # row is marked Is_Correct, must not silently import as an
+        # unanswerable Bow-Tie question.
+        by_section: dict[str, list] = {section: [] for section, _ in BowTieSection.choices}
+        for opt, section, _ in parsed:
+            by_section[section].append(opt)
+        for section, _ in BowTieSection.choices:
+            section_options = by_section[section]
+            if not section_options:
+                raise RowError(f"Bow-Tie questions require at least one {section.title()} option.")
+            if not any(_is_true(opt.get("Is_Correct")) for opt in section_options):
+                raise RowError(f"Bow-Tie {section.title()} section requires at least one correct option.")
+
+        question.bowtie_options.all().delete()
+        for opt, section, order in parsed:
             BowTieOption.objects.create(
                 question=question,
                 section=section,
@@ -738,13 +764,28 @@ class NgnItemBankImporter:
     def _sync_dragdrop_sequence(question, options):
         if not options:
             raise RowError("no Answer_Options rows for this Drag-and-Drop (Sequencing) question")
-        question.dragdrop_items.all().delete()
+
+        parsed = []
         for opt in options:
             option_id = opt.get("Option_ID") or ""
             match = re.match(r"Step\s+(\d+)", option_id)
             if not match:
                 raise RowError(f"Drag-and-Drop Option_ID {option_id!r} doesn't match 'Step N'")
-            order = int(match.group(1))
+            parsed.append((opt, int(match.group(1))))
+
+        orders = [order for _, order in parsed]
+        if sorted(orders) != list(range(1, len(parsed) + 1)):
+            # Same rule apps.questions.authoring._validate_dragdrop enforces
+            # for the manual admin editor — a duplicated or skipped step
+            # number (e.g. two "Step 2" rows from a typo) must not silently
+            # import as an ambiguously-sequenced question.
+            raise RowError(
+                f"Drag-and-Drop sequencing steps must be exactly 1..{len(parsed)} with no gaps or "
+                f"duplicates, got {sorted(orders)}."
+            )
+
+        question.dragdrop_items.all().delete()
+        for opt, order in parsed:
             DragDropItem.objects.create(
                 question=question,
                 text=opt.get("Option_Text") or "",
@@ -755,13 +796,21 @@ class NgnItemBankImporter:
 
     @staticmethod
     def _sync_dragdrop_category(question, options):
+        """
+        Every row is a real, placeable item — Option_ID is the item's own
+        label, Option_Text names the one category it correctly belongs in.
+        There is no "distractor" item in a sort-into-buckets question the
+        way there is a wrong AnswerChoice in an MCQ: validate_structure
+        (apps.questions.authoring) requires every DragDropItem to carry a
+        correct_category_key, matching what the manual admin editor
+        enforces. Is_Correct is not read here — it belongs to other
+        Answer_Options-sheet question types, not this one.
+        """
         if not options:
             raise RowError("no Answer_Options rows for this Drag-and-Drop (Category Matching) question")
-        category_names = list(
-            dict.fromkeys(opt.get("Option_Text") for opt in options if _is_true(opt.get("Is_Correct")))
-        )
+        category_names = list(dict.fromkeys(opt.get("Option_Text") for opt in options))
         if not category_names:
-            raise RowError("no Is_Correct=TRUE rows to derive drag-drop categories from")
+            raise RowError("no category names found in Option_Text for this Drag-and-Drop question")
 
         question.dragdrop_items.all().delete()
         question.dragdrop_categories.all().delete()
@@ -770,12 +819,11 @@ class NgnItemBankImporter:
             for i, name in enumerate(category_names)
         }
         for i, opt in enumerate(options):
-            is_correct = _is_true(opt.get("Is_Correct"))
             DragDropItem.objects.create(
                 question=question,
                 text=opt.get("Option_ID") or "",
                 display_order=i,
-                correct_category=categories.get(opt.get("Option_Text")) if is_correct else None,
+                correct_category=categories.get(opt.get("Option_Text")),
                 rationale=opt.get("Rationale") or "",
             )
 
@@ -787,14 +835,41 @@ class NgnItemBankImporter:
         for opt in options:
             option_id = opt.get("Option_ID") or ""
             match = re.match(r"Blank(\d+)_", option_id)
-            blank_key = f"dropdown {match.group(1)}" if match else "dropdown 1"
-            groups.setdefault(blank_key, []).append(opt)
+            if not match:
+                # Previously defaulted a typo'd/unmatched Option_ID to
+                # "dropdown 1", silently merging it into the wrong blank —
+                # reject instead, same as every other malformed-id case in
+                # this importer.
+                raise RowError(
+                    f"Cloze Option_ID {option_id!r} doesn't match the expected 'BlankN_...' pattern"
+                )
+            groups.setdefault(f"dropdown {match.group(1)}", []).append(opt)
 
         stem = question.stem or ""
-        for blank_key in groups:
-            if f"[{blank_key}]" not in stem:
+        stem_tokens = {token.strip().lower() for token in CLOZE_TOKEN_PATTERN.findall(stem)}
+        blank_keys = set(groups)
+
+        missing_in_stem = blank_keys - stem_tokens
+        if missing_in_stem:
+            raise RowError(
+                f"blank(s) {sorted(missing_in_stem)} have Answer_Options rows but no matching "
+                "[placeholder] in Stem"
+            )
+        missing_blank = stem_tokens - blank_keys
+        if missing_blank:
+            raise RowError(
+                f"Stem has [placeholder] token(s) {sorted(missing_blank)} with no matching Answer_Options rows"
+            )
+
+        # Same per-blank completeness rule apps.questions.authoring.
+        # _validate_cloze enforces for the manual admin editor.
+        for blank_key, blank_options in groups.items():
+            if len(blank_options) < 2:
+                raise RowError(f"blank {blank_key!r} requires at least 2 options, found {len(blank_options)}")
+            correct_count = sum(1 for opt in blank_options if _is_true(opt.get("Is_Correct")))
+            if correct_count != 1:
                 raise RowError(
-                    f"blank {blank_key!r} has answer options but no matching [{blank_key}] placeholder in Stem"
+                    f"blank {blank_key!r} must have exactly one correct option, found {correct_count}"
                 )
 
         question.cloze_blanks.all().delete()
@@ -812,6 +887,11 @@ class NgnItemBankImporter:
     def _sync_hotspot(question, options):
         if not options:
             raise RowError("no Answer_Options rows for this Hot Spot question")
+        if not any(_is_true(opt.get("Is_Correct")) for opt in options):
+            # Same rule apps.questions.authoring._validate_hotspot enforces
+            # for the manual admin editor — an all-incorrect target list
+            # must not silently import as an unanswerable question.
+            raise RowError("Hot Spot questions require at least one correct target (Is_Correct=TRUE row).")
         # A case-study item's own clinical_scenario is often just a short
         # hour label (e.g. "(Admission data, Hour 0)") — the actual passage
         # a Hot Spot item highlights within lives on the shared case, not

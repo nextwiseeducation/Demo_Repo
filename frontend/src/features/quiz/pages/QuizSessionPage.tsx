@@ -452,6 +452,7 @@ function QuizSessionInner({ quizSession }: { quizSession: QuizSessionData }) {
           // the same amber the navigator's flag/skipped states already
           // use), not just swap its icon color.
           className={isMarked ? "mark-btn-active" : undefined}
+          aria-pressed={isMarked}
           disabled={bookmarkMutation.isPending}
           onClick={() => bookmarkMutation.mutate()}
         >

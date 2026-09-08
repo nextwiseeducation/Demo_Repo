@@ -305,6 +305,19 @@ class Question(UUIDPKMixin, TimeStampedMixin, models.Model):
             # above.
             models.Index(fields=["is_active", "domain"], name="question_domain_idx"),
         ]
+        constraints = [
+            # Guards against two case-study items claiming the same position
+            # (e.g. a typo'd sequence number during authoring/import) —
+            # without this, case-study item ordering silently becomes
+            # ambiguous. Scoped to rows where case_study is set so ordinary,
+            # non-case-study questions (case_study_sequence always null)
+            # never collide with each other.
+            models.UniqueConstraint(
+                fields=["case_study", "case_study_sequence"],
+                condition=models.Q(case_study__isnull=False),
+                name="unique_case_study_sequence",
+            ),
+        ]
 
     def __str__(self):
         # [MCQ] A client with heart failure reports weight... — truncated
@@ -531,7 +544,7 @@ class DragDropItem(models.Model):
     # DragDropCategory this item is supposed to end up in. null/blank so it
     # can be left empty for the sequencing variant.
     correct_category = models.ForeignKey(
-        DragDropCategory, on_delete=models.CASCADE, null=True, blank=True, related_name="items"
+        DragDropCategory, on_delete=models.SET_NULL, null=True, blank=True, related_name="items"
     )
     # Used only by the "put these in the correct order" variant — this
     # item's correct position (1st, 2nd, 3rd...). null/blank so it can be

@@ -12,10 +12,10 @@ export function QuizProgressBar({
   return (
     <div className="flex-1 min-w-0">
       <div className="progress-row">
-        <span>
+        <span className="shrink-0 whitespace-nowrap">
           Question {currentIndex + 1} of {total}
         </span>
-        <span>
+        <span className="min-w-0 truncate">
           {question.nursing_system} · {DIFFICULTY_LABELS[question.difficulty]}
         </span>
       </div>

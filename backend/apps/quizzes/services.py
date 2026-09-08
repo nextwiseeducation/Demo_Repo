@@ -29,6 +29,7 @@ from django.db.models import (
     When,
 )
 
+from apps.core.query_params import filter_id_in
 from apps.questions.models import Question, QuestionType
 from apps.taxonomy.models import ClientNeedsSubcategory, Domain, ExamType, NursingSystem
 
@@ -98,9 +99,7 @@ def annotate_student_status(qs: QuerySet, student) -> QuerySet:
         # QuizSessionAbandonView). Either way the student is not coming back
         # to answer it in that session.
         is_omitted_eligible=Exists(
-            QuizSession.objects.filter(
-                student=student, questions=OuterRef("pk")
-            ).filter(Q(is_complete=True) | Q(is_abandoned=True))
+            QuizSession.objects.filter(student=student, questions=OuterRef("pk")).closed()
         ),
     )
     return qs.annotate(
@@ -135,13 +134,13 @@ def apply_taxonomy_filters(qs: QuerySet, filters: dict, *, exclude: frozenset = 
         qs = qs.filter(question_type__in=types)
 
     if "domains" not in exclude and filters.get("domains"):
-        qs = qs.filter(domain_id__in=filters["domains"])
+        qs = filter_id_in(qs, "domain", filters["domains"])
 
     if "nursing_systems" not in exclude and filters.get("nursing_systems"):
-        qs = qs.filter(nursing_system_id__in=filters["nursing_systems"])
+        qs = filter_id_in(qs, "nursing_system", filters["nursing_systems"])
 
     if "nclex_client_needs_subcategories" not in exclude and filters.get("nclex_client_needs_subcategories"):
-        qs = qs.filter(nclex_client_needs_subcategory_id__in=filters["nclex_client_needs_subcategories"])
+        qs = filter_id_in(qs, "nclex_client_needs_subcategory", filters["nclex_client_needs_subcategories"])
 
     if "status_filters" not in exclude and filters.get("status_filters"):
         selected_statuses = filters["status_filters"]

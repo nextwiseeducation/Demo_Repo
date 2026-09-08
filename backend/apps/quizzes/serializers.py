@@ -136,6 +136,7 @@ class QuizSessionSerializer(serializers.ModelSerializer):
             obj.response_logs.select_related("question")
             .prefetch_related(
                 "question__answer_choices",
+                "question__matrix_rows__cells",
                 "question__bowtie_options",
                 "question__cloze_blanks__options",
                 "question__dragdrop_items",
