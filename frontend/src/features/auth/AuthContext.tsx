@@ -4,6 +4,7 @@ import { toast } from "sonner";
 import * as authApi from "@/lib/api/auth";
 import { refreshAccessToken } from "@/lib/api/client";
 import { tokenStore } from "@/lib/api/tokenStore";
+import { queryClient } from "@/lib/queryClient";
 import type { Me } from "@/types/api";
 
 interface AuthContextValue {
@@ -53,6 +54,12 @@ export function AuthProvider({ children }: { children: ReactNode }) {
   useEffect(() => {
     return tokenStore.onSessionExpired(() => {
       setUser(null);
+      // Same reasoning as logout() below — react-query's cache is process-
+      // wide (one QueryClient for the app's whole lifetime, see
+      // lib/queryClient.ts), not scoped per account, so a per-student query
+      // like "is there a quiz in progress?" must not survive whoever logs
+      // in next in this tab.
+      queryClient.clear();
       toast.error("Your session expired. Please log in again.");
     });
   }, []);
@@ -68,6 +75,13 @@ export function AuthProvider({ children }: { children: ReactNode }) {
     const refresh = tokenStore.getRefreshToken();
     tokenStore.clear();
     setUser(null);
+    // react-query's cache is one process-wide QueryClient (lib/queryClient.ts),
+    // not reset per login — without this, a per-student query like "is
+    // there a quiz in progress?" (ResumeQuizPrompt.tsx, staleTime: Infinity
+    // so it never silently refetches) stays cached after logout and would
+    // be served straight back to whichever account logs in next in this
+    // same tab, showing them a resume prompt for a quiz that isn't theirs.
+    queryClient.clear();
     if (refresh) {
       // Best-effort — a failed logout call must never trap the user in a
       // "logged in" UI, local state is already cleared above regardless.

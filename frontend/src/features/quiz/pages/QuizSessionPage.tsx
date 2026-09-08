@@ -2,6 +2,7 @@ import { useMutation, useQuery } from "@tanstack/react-query";
 import { Bookmark, BookmarkCheck, ChevronLeft, ChevronRight } from "lucide-react";
 import { useEffect, useReducer, useRef } from "react";
 import { Navigate, useLocation, useNavigate } from "react-router-dom";
+import { toast } from "sonner";
 
 import { FullPageSpinner } from "@/components/common/LoadingSpinner";
 import { Button } from "@/components/ui/button";
@@ -288,6 +289,14 @@ function QuizSessionInner({ quizSession }: { quizSession: QuizSessionData }) {
         clearActiveQuizSessionId();
         navigate(ROUTES.quizResults, { state: { questions: session.questions, responses, totalTimeSeconds } });
       },
+      // A silent failure here used to be worse than it is now: every
+      // question already got marked is_complete server-side the moment the
+      // LAST one was answered (see QuizAnswerSubmitView's auto-complete),
+      // so this call is mostly a formality in that case. It still matters
+      // for finishing early with unanswered questions left, so a failure
+      // there needs to be visible rather than leaving the button looking
+      // stuck with no explanation.
+      onError: () => toast.error("Couldn't finish the quiz — please try again."),
     });
   }
 

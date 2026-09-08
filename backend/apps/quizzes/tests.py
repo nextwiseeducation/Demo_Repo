@@ -212,6 +212,29 @@ class QuizSessionCreateAPITests(APITestCase):
         response = self.client.post(reverse("quiz-session-create"), payload, format="json")
         self.assertEqual(response.status_code, status.HTTP_400_BAD_REQUEST)
 
+    def test_generating_a_new_quiz_abandons_the_students_other_in_progress_sessions(self):
+        # Otherwise an old session the student walked away from mid-quiz
+        # (browser closed without finishing) lingers as "in progress"
+        # forever and can resurface as a confusing, unrelated "continue
+        # your last quiz?" prompt well after this newer quiz is done.
+        stale_session = QuizSession.objects.create(student=self.user)
+        QuizSessionQuestion.objects.create(quiz_session=stale_session, question=self.question, position=0)
+        completed_session = QuizSession.objects.create(student=self.user, is_complete=True)
+        other_students_session = QuizSession.objects.create(student=User.objects.create_user(email="bystander@example.com", password="a-strong-password-123"))
+
+        payload = {"question_types": ["TRADITIONAL"], "question_count": 1}
+        self.client.post(reverse("quiz-session-create"), payload, format="json")
+
+        stale_session.refresh_from_db()
+        completed_session.refresh_from_db()
+        other_students_session.refresh_from_db()
+        self.assertTrue(stale_session.is_abandoned)
+        # A session already complete must not be touched — it was never
+        # "in progress" to begin with, and is_abandoned would be misleading
+        # (and irrelevant) on a session that finished normally.
+        self.assertFalse(completed_session.is_abandoned)
+        self.assertFalse(other_students_session.is_abandoned)
+
 
 class QuizAnswerSubmitAPITests(APITestCase):
     def setUp(self):
@@ -241,19 +264,68 @@ class QuizAnswerSubmitAPITests(APITestCase):
         self.assertEqual(log.selected_choice, self.correct)
         self.assertEqual(log.time_taken_seconds, 12)
 
-    def test_answering_does_not_move_position_or_complete_the_session(self):
-        # Position and completion are now owned entirely by
-        # QuizSessionPositionView/QuizSessionFinishView (free Previous/Next
-        # navigation means answering a question is a separate event from
-        # moving past it or finishing the quiz) — grading must not have the
-        # side effects it used to.
+    def test_answering_does_not_move_position(self):
+        # Position is owned entirely by QuizSessionPositionView (free
+        # Previous/Next navigation means answering a question is a separate
+        # event from moving past it) — grading must not have that side
+        # effect, unlike the old forward-only flow.
+        second_question = make_question(stem="A second question, left unanswered.")
+        AnswerChoice.objects.create(question=second_question, choice_text="Correct", is_correct=True)
+        QuizSessionQuestion.objects.create(quiz_session=self.session, question=second_question, position=1)
+
         payload = {"question_id": str(self.question.id), "selected_choice_ids": [str(self.correct.id)]}
         self.client.post(self._url(), payload, format="json")
 
         self.session.refresh_from_db()
         self.assertEqual(self.session.current_question_index, 0)
+
+    def test_answering_the_last_remaining_question_auto_completes_the_session(self):
+        # This session has exactly one question — answering it means every
+        # question now has a response, so the session should complete on
+        # its own without a separate explicit "Finish Quiz" call. Without
+        # this, a student who answers everything and just closes the tab
+        # (the natural thing to do once every question is graded) would
+        # leave the session is_complete=False forever, and
+        # QuizSessionActiveView would keep resurfacing "continue your last
+        # quiz?" on every future login even though nothing is left to do.
+        payload = {"question_id": str(self.question.id), "selected_choice_ids": [str(self.correct.id)]}
+        self.client.post(self._url(), payload, format="json")
+
+        self.session.refresh_from_db()
+        self.assertTrue(self.session.is_complete)
+        self.assertIsNotNone(self.session.completed_at)
+
+    def test_answering_only_some_questions_does_not_complete_the_session(self):
+        second_question = make_question(stem="A second question, left unanswered.")
+        AnswerChoice.objects.create(question=second_question, choice_text="Correct", is_correct=True)
+        QuizSessionQuestion.objects.create(quiz_session=self.session, question=second_question, position=1)
+
+        payload = {"question_id": str(self.question.id), "selected_choice_ids": [str(self.correct.id)]}
+        self.client.post(self._url(), payload, format="json")
+
+        self.session.refresh_from_db()
         self.assertFalse(self.session.is_complete)
         self.assertIsNone(self.session.completed_at)
+
+    def test_cannot_submit_into_an_already_complete_session(self):
+        self.session.is_complete = True
+        self.session.save(update_fields=["is_complete"])
+        payload = {"question_id": str(self.question.id), "selected_choice_ids": [str(self.correct.id)]}
+
+        response = self.client.post(self._url(), payload, format="json")
+
+        self.assertEqual(response.status_code, status.HTTP_409_CONFLICT)
+        self.assertFalse(StudentResponseLog.objects.filter(quiz_session=self.session).exists())
+
+    def test_cannot_submit_into_an_abandoned_session(self):
+        self.session.is_abandoned = True
+        self.session.save(update_fields=["is_abandoned"])
+        payload = {"question_id": str(self.question.id), "selected_choice_ids": [str(self.correct.id)]}
+
+        response = self.client.post(self._url(), payload, format="json")
+
+        self.assertEqual(response.status_code, status.HTTP_409_CONFLICT)
+        self.assertFalse(StudentResponseLog.objects.filter(quiz_session=self.session).exists())
 
     def test_cannot_submit_into_another_students_session(self):
         other_session = QuizSession.objects.create(student=self.other_user)

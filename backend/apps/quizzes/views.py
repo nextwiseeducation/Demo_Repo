@@ -42,6 +42,16 @@ class QuizSessionCreateView(APIView):
     never silently disagree with what was promised — then randomly samples
     question_count of them and persists the QuizSession plus its ordered
     QuizSessionQuestion rows in one transaction.
+
+    Also retires (abandons) any other session of this student's that is
+    still in progress. The product only ever shows the student one "quiz in
+    progress" at a time (QuizSessionActiveView's resume prompt, the nav bar's
+    single "Practice" entry point) — without this, starting a fresh quiz
+    while an old one was left mid-way (browser closed without finishing)
+    would silently orphan that old session, which then resurfaces as a
+    confusing, unrelated "continue your last quiz?" prompt on some later
+    login, well after the student finished the NEWER quiz and forgot the
+    old one ever existed.
     """
 
     permission_classes = [IsAuthenticated]
@@ -62,6 +72,9 @@ class QuizSessionCreateView(APIView):
             )
 
         with transaction.atomic():
+            QuizSession.objects.filter(student=request.user, is_complete=False, is_abandoned=False).update(
+                is_abandoned=True
+            )
             session = QuizSession.objects.create(student=request.user, filter_config=filters)
             QuizSessionQuestion.objects.bulk_create(
                 [
@@ -159,6 +172,10 @@ class QuizAnswerSubmitView(APIView):
         # after fetching) — one student cannot even discover whether
         # another student's session id exists via a 403-vs-404 distinction.
         session = get_object_or_404(QuizSession, pk=session_id, student=request.user)
+        if session.is_complete or session.is_abandoned:
+            return Response(
+                {"detail": "This quiz session is no longer accepting answers."}, status=status.HTTP_409_CONFLICT
+            )
 
         serializer = QuizAnswerSubmitSerializer(data=request.data)
         serializer.is_valid(raise_exception=True)
@@ -232,13 +249,30 @@ class QuizAnswerSubmitView(APIView):
             log.selected_payload = graded.detail
             log.save(update_fields=["selected_payload"])
 
-        # Deliberately does NOT touch session.current_question_index or
-        # is_complete — position is now owned entirely by
-        # QuizSessionPositionView (called on every Previous/Next/jump, not
-        # just a submission) and completion by QuizSessionFinishView (an
-        # explicit "Finish Quiz" action). Free navigation means answering a
-        # question is no longer the same event as moving past it or
-        # finishing the quiz.
+        # Deliberately does NOT touch session.current_question_index —
+        # position is owned entirely by QuizSessionPositionView (called on
+        # every Previous/Next/jump, not just a submission), since free
+        # navigation means answering a question is no longer the same event
+        # as moving past it.
+        #
+        # Completion, however, DOES get checked here: if this answer was the
+        # last remaining unanswered question, the session auto-completes
+        # rather than relying solely on the student explicitly clicking
+        # "Finish Quiz" (QuizSessionFinishView). Without this, a student who
+        # answers every question and simply closes the tab — the natural
+        # thing to do once every question shows "correct"/"incorrect" — would
+        # leave the session permanently is_complete=False, so
+        # QuizSessionActiveView keeps surfacing it as "continue your last
+        # quiz?" on every future login, forever, even though nothing is left
+        # to answer. QuizSessionFinishView stays as the explicit action for
+        # ending a quiz EARLY (some questions still skipped/unanswered).
+        total_questions = session.session_questions.count()
+        answered_questions = session.response_logs.values("question_id").distinct().count()
+        if answered_questions >= total_questions:
+            session.is_complete = True
+            session.completed_at = timezone.now()
+            session.save(update_fields=["is_complete", "completed_at"])
+
         return Response({"is_correct": is_correct, **response_body})
 
 
